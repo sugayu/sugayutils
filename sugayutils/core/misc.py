@@ -4,9 +4,7 @@ import numpy as np
 
 
 ##
-__all__ = [
-    'scale', 'get_nearest', 'get_argnearest'
-]
+__all__ = ['scale', 'get_nearest', 'get_argnearest']
 
 
 def scale(ndarray, scale):

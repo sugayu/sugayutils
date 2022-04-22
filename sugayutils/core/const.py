@@ -4,15 +4,14 @@ from typing import NamedTuple
 
 
 ##
-__all__ = [
-    'Colors', 'AstroConst', 'colors'
-]
+__all__ = ['Colors', 'AstroConst', 'colors']
 
 
 class Colors(NamedTuple):
     '''Default colors
     https://jfly.uni-koeln.de/colorset/
     '''
+
     blue: str = '#005aff'  # '0173b2' seaborn
     orange: str = '#f6aa00'  # 'de8f05'
     green: str = '#03af7a'  # '029e73'
@@ -39,10 +38,11 @@ class Colors(NamedTuple):
 class AstroConst(NamedTuple):
     '''Constants for Astronomy
     '''
+
     Lsun: float = 3.828 * 10 ** 33  # erg/s
     logOHsun: float = 8.67
-    c: float = 2.99792458e+10  # cm/s
-    ckm: float = 2.99792458e+5
+    c: float = 2.99792458e10  # cm/s
+    ckm: float = 2.99792458e5
     h: float = 6.62607015e-27  # erg/s
 
 
