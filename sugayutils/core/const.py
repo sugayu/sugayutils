@@ -1,7 +1,7 @@
 '''Setting colors
 '''
 from typing import NamedTuple
-
+from astropy import units as u
 
 ##
 __all__ = ['Colors', 'AstroConst', 'colors']
@@ -39,11 +39,7 @@ class AstroConst(NamedTuple):
     '''Constants for Astronomy
     '''
 
-    Lsun: float = 3.828 * 10 ** 33  # erg/s
-    logOHsun: float = 8.67
-    c: float = 2.99792458e10  # cm/s
-    ckm: float = 2.99792458e5
-    h: float = 6.62607015e-27  # erg/s
+    logOHsun: u.Quantity = 8.67 * u.dimensionless_unscaled
 
 
 colors = Colors()
