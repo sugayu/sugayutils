@@ -1,13 +1,14 @@
 '''Setting colors
 '''
-from typing import NamedTuple
+from dataclasses import dataclass
 from astropy import units as u
 
 ##
 __all__ = ['Colors', 'AstroConst', 'colors']
 
 
-class Colors(NamedTuple):
+@dataclass
+class Colors:
     '''Default colors
     https://jfly.uni-koeln.de/colorset/
     '''
@@ -35,7 +36,8 @@ class Colors(NamedTuple):
     bglay: str = '#c8c8cb'
 
 
-class AstroConst(NamedTuple):
+@dataclass
+class AstroConst:
     '''Constants for Astronomy
     '''
 
