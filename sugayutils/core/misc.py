@@ -4,7 +4,7 @@ import numpy as np
 
 
 ##
-__all__ = ['scale', 'get_nearest', 'get_argnearest']
+__all__ = ['scale', 'get_nearest', 'get_argnearest', 'stat']
 
 
 def scale(ndarray, scale):
@@ -36,3 +36,16 @@ def get_argnearest(value, value_list, num=1):
     diff = np.array(value_list) - value
     idx = np.argsort(np.abs(diff))
     return idx[:num]
+
+
+def stat(array: np.ndarray) -> dict:
+    '''Compute and Print statistical values of array.
+    '''
+    dict_output = {
+        'min': np.nanmin(array),
+        'max': np.nanmax(array),
+        'std': np.nanstd(array),
+        'sum': np.nansum(array),
+        'nan': not np.all(np.isfinite(array)),
+    }
+    return dict_output
