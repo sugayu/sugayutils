@@ -46,6 +46,7 @@ def stat(array: np.ndarray) -> dict:
         'max': np.nanmax(array),
         'std': np.nanstd(array),
         'sum': np.nansum(array),
-        'nan': not np.all(np.isfinite(array)),
+        'Npix': array.size,
+        'N_nan_or_inf': np.count_nonzero(np.logical_not(np.isfinite(array))),
     }
     return dict_output
