@@ -1,6 +1,7 @@
 ''' miscellaneous
 '''
 import numpy as np
+from typing import Any
 
 
 ##
@@ -39,8 +40,7 @@ def get_argnearest(value, value_list, num=1):
 
 
 def stat(array: np.ndarray) -> dict:
-    '''Compute and Print statistical values of array.
-    '''
+    '''Compute and Print statistical values of array.'''
     dict_output = {
         'min': np.nanmin(array),
         'max': np.nanmax(array),
@@ -52,3 +52,12 @@ def stat(array: np.ndarray) -> dict:
         'N_nan_or_inf': np.count_nonzero(np.logical_not(np.isfinite(array))),
     }
     return dict_output
+
+
+def listup_instancevar(instance: Any):
+    '''List up instance variables in classes.'''
+    return [
+        attr
+        for attr in dir(instance)
+        if not callable(getattr(instance, attr)) and not attr.startswith("__")
+    ]
