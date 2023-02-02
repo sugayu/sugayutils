@@ -12,8 +12,38 @@ __all__ = ['makefig']
 class Axes(mplaxes.Axes):
     '''Wrapper of Axes'''
 
-    def hello(self):
-        print('hello')
+    def remove_xticklabel(self):
+        '''Erase xlabel'''
+        return self.xaxis.set_ticklabels('')
+
+    def remove_yticklabel(self):
+        '''Erase ylabel'''
+        return self.yaxis.set_ticklabels('')
+
+    def remove_xyticklabels(self):
+        '''Erase both x and y labels'''
+        self.xaxis.set_ticklabels('')
+        self.yaxis.set_ticklabels('')
+
+    def set_xylims(self, xlim, ylim):
+        '''Set xlim and ylim at the same time.'''
+        self.set_xlim(xlim)
+        self.set_ylim(ylim)
+
+    def set_xylabels(self, xlabel, ylabel):
+        '''Set xlabel and ylable at the same time.'''
+        self.set_xlabel(xlabel)
+        self.set_ylabel(ylabel)
+
+    def remove_frame(self):
+        '''Remove all contents of the frame.'''
+        self.spines['top'].set_color('none')
+        self.spines['bottom'].set_color('none')
+        self.spines['left'].set_color('none')
+        self.spines['right'].set_color('none')
+        self.tick_params(
+            labelcolor='none', top=False, bottom=False, left=False, right=False
+        )
 
 
 class Figure(mplfig.Figure):
