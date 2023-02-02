@@ -11,5 +11,4 @@ from .misc import *
 
 __all__ = hello.__all__
 __all__ += const.__all__
-__all__ += literature.__all__
 __all__ += misc.__all__
