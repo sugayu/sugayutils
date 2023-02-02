@@ -20,9 +20,10 @@ class Axes(mplaxes.Axes):
     def plot(
         self,
         *args,
-        c: None | str = None,
-        mec: None | str = None,
-        mfc: None | str = None,
+        c: str | None = None,
+        mec: str | None = None,
+        mfc: str | None = None,
+        m: str | None = None,
         **kwargs,
     ):
         '''Wrapper of plot'''
@@ -33,39 +34,65 @@ class Axes(mplaxes.Axes):
             _kwargs['mec'] = self.colorful(mec)
         if mfc is not None:
             _kwargs['mfc'] = self.colorful(mfc)
+        if m is not None:
+            _kwargs['marker'] = m
         return super().plot(*args, **_kwargs)
 
     def scatter(
         self,
         *args,
-        c: None | str | Iterable = None,
-        mec: None | str | Iterable = None,
+        c: str | Iterable | None = None,
+        mec: str | Iterable | None = None,
+        mew: str | Iterable | None = None,
         **kwargs,
     ):
         '''Wrapper of scatter'''
         _kwargs = kwargs.copy()
         if c is not None:
-            if isinstance(c, str):
-                _kwargs['c'] = self.colorful(c)
-            else:
-                _kwargs['c'] = c
+            _kwargs['c'] = self.colorful(c) if isinstance(c, str) else c
         if mec is not None:
-            if isinstance(mec, str):
-                _kwargs['edgecolors'] = self.colorful(mec)
-            else:
-                _kwargs['edgecolors'] = mec
+            _kwargs['edgecolors'] = self.colorful(mec) if isinstance(mec, str) else mec
+        if mew is not None:
+            _kwargs['linewidths'] = mew
         return super().scatter(*args, **_kwargs)
 
-    def errorbar(self, *args, c: None | str = None, ec: None | str = None, **kwargs):
+    def errorbar(
+        self,
+        *args,
+        c: str | None = None,
+        ec: str | None = None,
+        mec: str | None = None,
+        elw: str | None = None,
+        **kwargs,
+    ):
         '''Wrapper of scatter'''
         _kwargs = kwargs.copy()
         if c is not None:
             _kwargs['color'] = self.colorful(c)
         if ec is not None:
             _kwargs['ecolor'] = self.colorful(ec)
-        return super().scatter(*args, **_kwargs)
+        if mec is not None:
+            _kwargs['markeredgecolor'] = self.colorful(mec)
+        if elw is not None:
+            _kwargs['elinewidth'] = elw
+        return super().errorbar(*args, **_kwargs)
 
-    def text(self, *args, c: None | str = None, **kwargs):
+    def hist(
+        self,
+        *args,
+        c: str | None = None,
+        ec: str | None = None,
+        **kwargs,
+    ):
+        '''Wrapper of scatter'''
+        _kwargs = kwargs.copy()
+        if c is not None:
+            _kwargs['color'] = self.colorful(c)
+        if ec is not None:
+            _kwargs['ecolor'] = self.colorful(ec)
+        return super().errorbar(*args, **_kwargs)
+
+    def text(self, *args, c: str | None = None, **kwargs):
         '''Wrapper of text'''
         _kwargs = kwargs.copy()
         if c is not None:
