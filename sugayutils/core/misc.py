@@ -44,6 +44,8 @@ def stat(array: np.ndarray) -> dict:
     dict_output = {
         'min': np.nanmin(array),
         'max': np.nanmax(array),
+        'mean': np.nanmean(array),
+        'med': np.nanmedian(array),
         'std': np.nanstd(array),
         'sum': np.nansum(array),
         'Npix': array.size,

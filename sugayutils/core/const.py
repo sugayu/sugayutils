@@ -1,4 +1,4 @@
-'''Setting colors
+'''Setting constants
 '''
 from dataclasses import dataclass
 from astropy import units as u
@@ -38,8 +38,7 @@ class Colors:
 
 @dataclass
 class AstroConst:
-    '''Constants for Astronomy
-    '''
+    '''Constants for Astronomy'''
 
     logOHsun: u.Quantity = 8.67 * u.dimensionless_unscaled
 
