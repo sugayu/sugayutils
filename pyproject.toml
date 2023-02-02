@@ -6,6 +6,7 @@ skip-string-normalization = true
 [[tool.mypy.overrides]]
 module = [
        'scipy.*',
-       'astropy.*'
+       'astropy.*',
+       'matplotlib.*'
 ]
 ignore_missing_imports = true
