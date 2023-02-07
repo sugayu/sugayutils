@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from ..core.const import colors
 from ..core.misc import listup_instancevar
 
-__all__ = ['makefig']
+__all__ = ['makefig', 'Axes', 'Figure']
 
 
 ##
@@ -90,14 +90,14 @@ class Axes(mplaxes.Axes):
             _kwargs['color'] = self.colorful(c)
         if ec is not None:
             _kwargs['ecolor'] = self.colorful(ec)
-        return super().errorbar(*args, **_kwargs)
+        return super().hist(*args, **_kwargs)
 
     def text(self, *args, c: str | None = None, **kwargs):
         '''Wrapper of text'''
         _kwargs = kwargs.copy()
         if c is not None:
             _kwargs['color'] = self.colorful(c)
-        return super().scatter(*args, **_kwargs)
+        return super().text(*args, **_kwargs)
 
     def remove_xticklabel(self):
         '''Erase xlabel'''
