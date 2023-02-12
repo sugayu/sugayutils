@@ -43,7 +43,7 @@ class Axes(mplaxes.Axes):
         *args,
         c: str | Iterable | None = None,
         mec: str | Iterable | None = None,
-        mew: str | Iterable | None = None,
+        mew: float | Iterable | None = None,
         **kwargs,
     ):
         '''Wrapper of scatter'''
@@ -60,15 +60,18 @@ class Axes(mplaxes.Axes):
         self,
         *args,
         c: str | None = None,
+        m: str | None = None,
         ec: str | None = None,
         mec: str | None = None,
-        elw: str | None = None,
+        elw: float | None = None,
         **kwargs,
     ):
         '''Wrapper of scatter'''
         _kwargs = kwargs.copy()
         if c is not None:
             _kwargs['color'] = self.colorful(c)
+        if m is not None:
+            _kwargs['marker'] = m
         if ec is not None:
             _kwargs['ecolor'] = self.colorful(ec)
         if mec is not None:
@@ -98,6 +101,36 @@ class Axes(mplaxes.Axes):
         if c is not None:
             _kwargs['color'] = self.colorful(c)
         return super().text(*args, **_kwargs)
+
+    def fill_between(
+        self,
+        *args,
+        c: str | None = None,
+        ec: str | None = None,
+        **kwargs,
+    ):
+        '''Wrapper of fill_between.'''
+        _kwargs = kwargs.copy()
+        if c is not None:
+            _kwargs['color'] = self.colorful(c)
+        if ec is not None:
+            _kwargs['edgecolor'] = self.colorful(ec)
+        return super().fill_between(*args, **_kwargs)
+
+    def fill_betweenx(
+        self,
+        *args,
+        c: str | None = None,
+        ec: str | None = None,
+        **kwargs,
+    ):
+        '''Wrapper of fill_betweenx.'''
+        _kwargs = kwargs.copy()
+        if c is not None:
+            _kwargs['color'] = self.colorful(c)
+        if ec is not None:
+            _kwargs['edgecolor'] = self.colorful(ec)
+        return super().fill_betweenx(*args, **_kwargs)
 
     def remove_xticklabel(self):
         '''Erase xlabel'''
@@ -142,21 +175,17 @@ class Axes(mplaxes.Axes):
 class Figure(mplfig.Figure):
     '''Wrapper of Figure'''
 
-    def subplots(self, *args, subplot_kw=None, **kwargs) -> list[Axes]:
-        if subplot_kw is None:
-            subplot_kw = {'axes_class': Axes}
-        else:
-            subplot_kw['axes_class'] = Axes
-        axes = super().subplots(subplot_kw=subplot_kw, *args, **kwargs)
-        return axes
+    def subplots(self, *args, subplot_kw: dict = {}, **kwargs) -> list[Axes]:
+        subplot_kw.setdefault('axes_class', Axes)
+        return super().subplots(subplot_kw=subplot_kw, *args, **kwargs)
 
     def add_axes(self, *args, **kwargs) -> Axes:
-        ax = super().add_axes(axes_class=Axes, *args, **kwargs)
-        return ax
+        kwargs.setdefault('axes_class', Axes)
+        return super().add_axes(*args, **kwargs)
 
     def add_subplot(self, *args, **kwargs) -> Axes:
-        ax = super().add_subplot(axes_class=Axes, *args, **kwargs)
-        return ax
+        kwargs.setdefault('axes_class', Axes)
+        return super().add_subplot(*args, **kwargs)
 
 
 def makefig(**kwargs) -> Figure:
