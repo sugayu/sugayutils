@@ -83,20 +83,18 @@ class Axes(mplaxes.Axes):
             _kwargs['elinewidth'] = elw
         return super().errorbar(*args, **_kwargs)
 
-    def hist(
-        self, *args, c: str | None = None, ec: str | None = None, **kwargs,
-    ):
+    def hist(self, *args, c: str | None = None, ec: str | None = None, **kwargs):
         '''Wrapper of scatter'''
         _kwargs = kwargs.copy()
         if c is not None:
             _kwargs['color'] = self.colorful(c)
         if ec is not None:
             _kwargs['ecolor'] = self.colorful(ec)
+        if not 'rwidth' in _kwargs:
+            _kwargs['rwidth'] = 0.95
         return super().hist(*args, **_kwargs)
 
-    def contour(
-        self, *args, c: str | None = None, **kwargs,
-    ):
+    def contour(self, *args, c: str | None = None, **kwargs):
         '''Wrapper of plot'''
         _kwargs = kwargs.copy()
         if c is not None:
@@ -132,8 +130,22 @@ class Axes(mplaxes.Axes):
             txt.set_path_effects(border)
         return txt
 
+    def axhline(self, *args, c: str | None = None, **kwargs):
+        '''Wrapper of axhline'''
+        _kwargs = kwargs.copy()
+        if c is not None:
+            _kwargs['color'] = self.colorful(c)
+        return super().axhline(*args, **_kwargs)
+
+    def axvline(self, *args, c: str | None = None, **kwargs):
+        '''Wrapper of axvline'''
+        _kwargs = kwargs.copy()
+        if c is not None:
+            _kwargs['color'] = self.colorful(c)
+        return super().axvline(*args, **_kwargs)
+
     def fill_between(
-        self, *args, c: str | None = None, ec: str | None = None, **kwargs,
+        self, *args, c: str | None = None, ec: str | None = None, **kwargs
     ):
         '''Wrapper of fill_between.'''
         _kwargs = kwargs.copy()
@@ -144,7 +156,7 @@ class Axes(mplaxes.Axes):
         return super().fill_between(*args, **_kwargs)
 
     def fill_betweenx(
-        self, *args, c: str | None = None, ec: str | None = None, **kwargs,
+        self, *args, c: str | None = None, ec: str | None = None, **kwargs
     ):
         '''Wrapper of fill_betweenx.'''
         _kwargs = kwargs.copy()
