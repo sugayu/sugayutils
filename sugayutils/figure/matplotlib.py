@@ -94,6 +94,15 @@ class Axes(mplaxes.Axes):
             _kwargs['ecolor'] = self.colorful(ec)
         return super().hist(*args, **_kwargs)
 
+    def contour(
+        self, *args, c: str | None = None, **kwargs,
+    ):
+        '''Wrapper of plot'''
+        _kwargs = kwargs.copy()
+        if c is not None:
+            _kwargs['colors'] = self.colorful(c)
+        return super().contour(*args, **_kwargs)
+
     def text(
         self,
         *args,
