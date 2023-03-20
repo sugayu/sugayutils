@@ -177,6 +177,22 @@ class Figure(mplfig.Figure):
         kwargs.setdefault('axes_class', Axes)
         return super().add_subplot(*args, **kwargs)
 
+    def colorbar(self, *args, ax_for_autopos=None, **kwargs):
+        cax = super().colorbar(*args, **kwargs)
+        if ax_for_autopos is not None:
+            ax_pos = ax_for_autopos.get_position()
+            cax_pos = cax.ax.get_position()
+            _location = kwargs.get('location', 'right')
+            if _location in ['right', 'left']:
+                cax.ax.set_position(
+                    [cax_pos.x0, ax_pos.y0, cax_pos.width, ax_pos.height]
+                )
+            elif _location in ['top', 'bottom']:
+                cax.ax.set_position(
+                    [ax_pos.x0, cax_pos.y0, ax_pos.width, cax_pos.height]
+                )
+        return cax
+
 
 def makefig(**kwargs) -> Figure:
     '''Wrapper of plt.figure().'''
