@@ -2,13 +2,15 @@
 '''
 from __future__ import annotations
 from typing import Iterable
+import numpy as np
 import matplotlib.figure as mplfig
 import matplotlib.axes as mplaxes
 import matplotlib.pyplot as plt
+import matplotlib.colors as mplcolors
 from ..core.const import colors
 from ..core.misc import listup_instancevar
 
-__all__ = ['makefig', 'Axes', 'Figure']
+__all__ = ['makefig', 'Axes', 'Figure', 'DS9LogNorm']
 
 
 ##
@@ -81,11 +83,7 @@ class Axes(mplaxes.Axes):
         return super().errorbar(*args, **_kwargs)
 
     def hist(
-        self,
-        *args,
-        c: str | None = None,
-        ec: str | None = None,
-        **kwargs,
+        self, *args, c: str | None = None, ec: str | None = None, **kwargs,
     ):
         '''Wrapper of scatter'''
         _kwargs = kwargs.copy()
@@ -103,11 +101,7 @@ class Axes(mplaxes.Axes):
         return super().text(*args, **_kwargs)
 
     def fill_between(
-        self,
-        *args,
-        c: str | None = None,
-        ec: str | None = None,
-        **kwargs,
+        self, *args, c: str | None = None, ec: str | None = None, **kwargs,
     ):
         '''Wrapper of fill_between.'''
         _kwargs = kwargs.copy()
@@ -118,11 +112,7 @@ class Axes(mplaxes.Axes):
         return super().fill_between(*args, **_kwargs)
 
     def fill_betweenx(
-        self,
-        *args,
-        c: str | None = None,
-        ec: str | None = None,
-        **kwargs,
+        self, *args, c: str | None = None, ec: str | None = None, **kwargs,
     ):
         '''Wrapper of fill_betweenx.'''
         _kwargs = kwargs.copy()
@@ -187,7 +177,59 @@ class Figure(mplfig.Figure):
         kwargs.setdefault('axes_class', Axes)
         return super().add_subplot(*args, **kwargs)
 
+    def colorbar(self, *args, ax_for_autopos=None, **kwargs):
+        cax = super().colorbar(*args, **kwargs)
+        if ax_for_autopos is not None:
+            ax_pos = ax_for_autopos.get_position()
+            cax_pos = cax.ax.get_position()
+            _location = kwargs.get('location', 'right')
+            if _location in ['right', 'left']:
+                cax.ax.set_position(
+                    [cax_pos.x0, ax_pos.y0, cax_pos.width, ax_pos.height]
+                )
+            elif _location in ['top', 'bottom']:
+                cax.ax.set_position(
+                    [ax_pos.x0, cax_pos.y0, ax_pos.width, cax_pos.height]
+                )
+        return cax
+
 
 def makefig(**kwargs) -> Figure:
     '''Wrapper of plt.figure().'''
     return plt.figure(FigureClass=Figure, **kwargs)
+
+
+class DS9LogNorm:
+    '''Log scale used in DS9.
+    http://ds9.si.edu/doc/ref/how.html
+    '''
+
+    def __init__(self, xmin: float, xmax: float, a: float = 1000.0) -> None:
+        _min = xmin
+        _max = xmax
+
+        def log_scale(data):
+            scale = (data - _min) / (_max - _min)
+            scale[scale < 0] = 0
+            scale[scale > 1] = 1
+            scale_log = np.log10(a * scale + 1) / np.log10(a)
+            return scale_log
+
+        def log_scale_inverse(scale_log):
+            scale = (10.0 ** (scale_log * np.log10(a)) - 1) / a
+            data = scale * (_max - _min) + _min
+            return data
+
+        self.min = _min
+        self.max = _max
+        self.log_scale = log_scale
+        self.log_scale_inverse = log_scale_inverse
+
+    def __call__(
+        self, vmin: None | float = None, vmax: None | float = None
+    ) -> mplcolors.FuncNorm:
+        _vmin = vmin if vmin is not None else self.min
+        _vmax = vmax if vmin is not None else self.max
+        return mplcolors.FuncNorm(
+            (self.log_scale, self.log_scale_inverse), vmin=_vmin, vmax=_vmax
+        )
