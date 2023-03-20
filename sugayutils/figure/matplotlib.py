@@ -7,6 +7,7 @@ import matplotlib.figure as mplfig
 import matplotlib.axes as mplaxes
 import matplotlib.pyplot as plt
 import matplotlib.colors as mplcolors
+import matplotlib.patheffects as path_effects
 from ..core.const import colors
 from ..core.misc import listup_instancevar
 
@@ -93,12 +94,34 @@ class Axes(mplaxes.Axes):
             _kwargs['ecolor'] = self.colorful(ec)
         return super().hist(*args, **_kwargs)
 
-    def text(self, *args, c: str | None = None, **kwargs):
+    def text(
+        self,
+        *args,
+        c: str | None = None,
+        borders: tuple[str, float] | list[tuple[str, float]] | None = None,
+        **kwargs,
+    ):
         '''Wrapper of text'''
         _kwargs = kwargs.copy()
         if c is not None:
             _kwargs['color'] = self.colorful(c)
-        return super().text(*args, **_kwargs)
+        txt = super().text(*args, **_kwargs)
+
+        if borders is not None:
+            if isinstance(borders, tuple):
+                fg = self.colorful(borders[0])
+                border = [
+                    path_effects.Stroke(foreground=fg, linewidth=borders[1]),
+                    path_effects.Normal(),
+                ]
+            elif isinstance(borders, list):
+                border = [
+                    path_effects.Stroke(foreground=self.colorful(b[0]), linewidth=b[1])
+                    for b in borders
+                ]
+                border.append(path_effects.Normal())
+            txt.set_path_effects(border)
+        return txt
 
     def fill_between(
         self, *args, c: str | None = None, ec: str | None = None, **kwargs,
