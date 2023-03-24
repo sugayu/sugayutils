@@ -94,11 +94,22 @@ class Axes(mplaxes.Axes):
             _kwargs['rwidth'] = 0.95
         return super().hist(*args, **_kwargs)
 
-    def contour(self, *args, c: str | None = None, **kwargs):
+    def contour(
+        self,
+        *args,
+        c: str | None = None,
+        lw: str | None = None,
+        ls: str | None = None,
+        **kwargs,
+    ):
         '''Wrapper of plot'''
         _kwargs = kwargs.copy()
         if c is not None:
             _kwargs['colors'] = self.colorful(c)
+        if lw is not None:
+            _kwargs['linewidths'] = lw
+        if ls is not None:
+            _kwargs['linestyles'] = ls
         return super().contour(*args, **_kwargs)
 
     def text(
@@ -115,18 +126,7 @@ class Axes(mplaxes.Axes):
         txt = super().text(*args, **_kwargs)
 
         if borders is not None:
-            if isinstance(borders, tuple):
-                fg = self.colorful(borders[0])
-                border = [
-                    path_effects.Stroke(foreground=fg, linewidth=borders[1]),
-                    path_effects.Normal(),
-                ]
-            elif isinstance(borders, list):
-                border = [
-                    path_effects.Stroke(foreground=self.colorful(b[0]), linewidth=b[1])
-                    for b in borders
-                ]
-                border.append(path_effects.Normal())
+            border = styling_border(borders)
             txt.set_path_effects(border)
         return txt
 
@@ -222,20 +222,44 @@ class Figure(mplfig.Figure):
         return super().add_subplot(*args, **kwargs)
 
     def colorbar(self, *args, ax_for_autopos=None, **kwargs):
+        '''Wrapper of Color bar.
+        ax_for_autopos: automatically set color bar position.
+        '''
         cax = super().colorbar(*args, **kwargs)
         if ax_for_autopos is not None:
-            ax_pos = ax_for_autopos.get_position()
-            cax_pos = cax.ax.get_position()
-            _location = kwargs.get('location', 'right')
-            if _location in ['right', 'left']:
-                cax.ax.set_position(
-                    [cax_pos.x0, ax_pos.y0, cax_pos.width, ax_pos.height]
-                )
-            elif _location in ['top', 'bottom']:
-                cax.ax.set_position(
-                    [ax_pos.x0, cax_pos.y0, ax_pos.width, cax_pos.height]
-                )
+            cax = autolocate_cax(cax, ax_for_autopos, kwargs.get('location', 'right'))
         return cax
+
+
+def autolocate_cax(cax, ax, location='right'):
+    '''Automatically set position of colorbar'''
+    ax_pos = ax.get_position()
+    cax_pos = cax.ax.get_position()
+    if location in ['right', 'left']:
+        cax.ax.set_position([cax_pos.x0, ax_pos.y0, cax_pos.width, ax_pos.height])
+    elif location in ['top', 'bottom']:
+        cax.ax.set_position([ax_pos.x0, cax_pos.y0, ax_pos.width, cax_pos.height])
+    return cax
+
+
+def styling_border(types):
+    '''Add borders to text and other objects.
+
+    type is (color, width).
+    '''
+    if isinstance(types, tuple):
+        fg = Axes.colorful(Axes, types[0])
+        border = [
+            path_effects.Stroke(foreground=fg, linewidth=types[1]),
+            path_effects.Normal(),
+        ]
+    elif isinstance(types, list):
+        border = [
+            path_effects.Stroke(foreground=Axes.colorful(t[0]), linewidth=t[1])
+            for t in types
+        ]
+        border.append(path_effects.Normal())
+    return border
 
 
 def makefig(**kwargs) -> Figure:
