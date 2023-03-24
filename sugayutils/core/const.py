@@ -21,7 +21,7 @@ class Colors:
     brown: str = '#804000'  # 'ca9161'
     pink: str = '#ff8082'  # 'fbafe4'
     gray: str = '#84919e'  # '949494'
-    glay: str = '#84919e'  # '949494'
+    grey: str = '#84919e'  # '949494'
     yellow: str = '#fff100'  # 'ece133'
     sky: str = '#4dc4ff'  # '56b4e9'
     black: str = '#323232'
@@ -33,7 +33,7 @@ class Colors:
     byellow: str = '#ffff80'
     bsky: str = '#bfe4ff'
     bgray: str = '#c8c8cb'
-    bglay: str = '#c8c8cb'
+    bgrey: str = '#c8c8cb'
 
 
 @dataclass
