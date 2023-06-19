@@ -34,6 +34,7 @@ class Colors:
     bsky: str = '#bfe4ff'
     bgray: str = '#c8c8cb'
     bgrey: str = '#c8c8cb'
+    white: str = '#ffffff'
 
 
 @dataclass

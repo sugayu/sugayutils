@@ -47,6 +47,7 @@ class Axes(mplaxes.Axes):
         c: str | Iterable | None = None,
         mec: str | Iterable | None = None,
         mew: float | Iterable | None = None,
+        m: str | None = None,
         **kwargs,
     ):
         '''Wrapper of scatter'''
@@ -57,6 +58,8 @@ class Axes(mplaxes.Axes):
             _kwargs['edgecolors'] = self.colorful(mec) if isinstance(mec, str) else mec
         if mew is not None:
             _kwargs['linewidths'] = mew
+        if m is not None:
+            _kwargs['marker'] = m
         return super().scatter(*args, **_kwargs)
 
     def errorbar(
@@ -196,7 +199,12 @@ class Axes(mplaxes.Axes):
         self.spines['left'].set_color('none')
         self.spines['right'].set_color('none')
         self.tick_params(
-            labelcolor='none', top=False, bottom=False, left=False, right=False
+            which='both',
+            labelcolor='none',
+            top=False,
+            bottom=False,
+            left=False,
+            right=False,
         )
 
     def colorful(self, color_key: str) -> str:
