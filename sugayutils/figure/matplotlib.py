@@ -1,7 +1,7 @@
 '''Wrapper of Matplotlib.
 '''
 from __future__ import annotations
-from typing import Iterable
+from typing import Iterable, Sequence
 import numpy as np
 import matplotlib.figure as mplfig
 import matplotlib.axes as mplaxes
@@ -10,6 +10,7 @@ import matplotlib.colors as mplcolors
 import matplotlib.patheffects as path_effects
 from ..core.const import colors
 from ..core.misc import listup_instancevar
+from ..stat.kde import KDE
 
 __all__ = ['makefig', 'Axes', 'Figure', 'DS9LogNorm']
 
@@ -169,6 +170,72 @@ class Axes(mplaxes.Axes):
             _kwargs['edgecolor'] = self.colorful(ec)
         return super().fill_betweenx(*args, **_kwargs)
 
+    def kdehist(
+        self,
+        data: np.ndarray,
+        x: np.ndarray | None = None,
+        is_fill: bool = False,
+        is_mark: bool = False,
+        fill_kwargs: dict = {},
+        mark_kwargs: dict = {},
+        lim: Sequence = [None, None],
+        baseline: float | np.ndarray = 0.0,
+        orientation: str = 'horizontal',
+        **kwargs,
+    ):
+        '''Histogram with KDE.
+
+        Args:
+            data (np.ndarray): 1d data
+            x (np.ndarray | None, optional): x data points to plot kde.
+                Defaults to None.
+            is_fill (bool, optional): If True, kde is filled. Defaults to False.
+            is_mark (bool, optional): If True, plot markers at percentiles.
+                Defaults to False.
+            fill_kwargs (dict, optional): Keywords for ax.fill_between().
+                Defaults to {}.
+            mark_kwargs (dict, optional): Keywords for ax.scatter().
+                Defaults to {}.
+            lim (Sequence, optional): Tuple or list defining minimum and
+                maximum of kde.Defaults to [None, None].
+            baseline (float | np.ndarray, optional): y-value of x-axis.
+                This argument is usefull to plot multiple kdes in one plot.
+                Defaults to 0.0.
+            orientation (str, optional): 'vertical' ('v') or 'horizontal' ('h').
+                Defaults to horizontal'.
+        '''
+        if data.squeeze().ndim > 1:
+            raise TypeError('kdehist can be only used for 1d input.')
+
+        kernel = KDE(data)
+        _data = kernel.dataset.squeeze()
+        if x is None:
+            range_data = _data.max() - _data.min()
+            xmin = _data.min() - range_data * 0.4
+            xmax = _data.max() + range_data * 0.4
+            x = np.linspace(xmin, xmax, 100)
+        pdf = kernel(x, lim) + baseline
+
+        if orientation == 'horizontal' or orientation == 'h':
+            xx, yy = x, pdf
+            fill = self.fill_between
+        elif orientation == 'vertical' or orientation == 'v':
+            xx, yy = pdf, x
+            fill = self.fill_betweenx
+        else:
+            raise ValueError('The orientation is "vertical" or "horizontal".')
+
+        p = self.plot(xx, yy, **kwargs)
+        if is_fill:
+            fill(x, pdf, baseline, **fill_kwargs)
+        if is_mark:
+            xmarks = np.nanpercentile(data, [16, 50, 84])
+            ymarks = kernel(xmarks, lim) + baseline
+            if orientation == 'vertical' or orientation == 'v':
+                xmarks, ymarks = ymarks, xmarks
+            self.scatter(xmarks, ymarks, **mark_kwargs)
+        return p
+
     def remove_xticklabel(self):
         '''Erase xlabel'''
         return self.xaxis.set_ticklabels('')
@@ -272,7 +339,10 @@ def styling_border(types):
 
 def makefig(**kwargs) -> Figure:
     '''Wrapper of plt.figure().'''
-    return plt.figure(FigureClass=Figure, **kwargs)
+    _kwargs = kwargs.copy()
+    if ('figsize' in kwargs) and ('a4' in kwargs['figsize']):
+        _kwargs['figsize'] = (8.27, 11.69)
+    return plt.figure(FigureClass=Figure, **_kwargs)
 
 
 class DS9LogNorm:
