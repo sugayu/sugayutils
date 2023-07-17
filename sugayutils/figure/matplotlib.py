@@ -175,7 +175,9 @@ class Axes(mplaxes.Axes):
         data: np.ndarray,
         x: np.ndarray | None = None,
         is_fill: bool = False,
+        is_mark: bool = False,
         fill_kwargs: dict = {},
+        mark_kwargs: dict = {},
         lim: Sequence = [None, None],
         baseline: float | np.ndarray = 0.0,
         orientation: str = 'horizontal',
@@ -188,7 +190,11 @@ class Axes(mplaxes.Axes):
             x (np.ndarray | None, optional): x data points to plot kde.
                 Defaults to None.
             is_fill (bool, optional): If True, kde is filled. Defaults to False.
+            is_mark (bool, optional): If True, plot markers at percentiles.
+                Defaults to False.
             fill_kwargs (dict, optional): Keywords for ax.fill_between().
+                Defaults to {}.
+            mark_kwargs (dict, optional): Keywords for ax.scatter().
                 Defaults to {}.
             lim (Sequence, optional): Tuple or list defining minimum and
                 maximum of kde.Defaults to [None, None].
@@ -222,6 +228,12 @@ class Axes(mplaxes.Axes):
         p = self.plot(xx, yy, **kwargs)
         if is_fill:
             fill(x, pdf, baseline, **fill_kwargs)
+        if is_mark:
+            xmarks = np.nanpercentile(data, [16, 50, 84])
+            ymarks = kernel(xmarks, lim) + baseline
+            if orientation == 'vertical' or orientation == 'v':
+                xmarks, ymarks = ymarks, xmarks
+            self.scatter(xmarks, ymarks, **mark_kwargs)
         return p
 
     def remove_xticklabel(self):
