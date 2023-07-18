@@ -48,6 +48,7 @@ def convert_for_bagpipes(
     hdu_list = []
     hdu_list.append(fits.PrimaryHDU())
     liv_mstar_frac = []
+    initial_mass = 1.0e6
 
     for i, (f, z, fm) in enumerate(zip(fnames, zmet, fnames_starmass)):
         # main spectral data
@@ -55,7 +56,7 @@ def convert_for_bagpipes(
         if i == 0:
             n_age = data.shape[1] - 1
             wavelength = data[:, 0]
-        spectra = data[:, 1:]
+        spectra = data[:, 1:] / initial_mass
         hdu_list.append(fits.ImageHDU(spectra.T, name=f'ZMET{z:0.4f}ZSOL'))
 
         # needed for computing LIV_MSTAR_FRAC after for loop
@@ -64,7 +65,7 @@ def convert_for_bagpipes(
             remaining_mass = data_sm[:, 1] + data_sm[:, 2]
         else:
             remaining_mass = data_sm[:, 1]
-        _liv_mstar_frac = remaining_mass / 1.0e6
+        _liv_mstar_frac = remaining_mass / initial_mass
         _liv_mstar_frac[_liv_mstar_frac > 1] = 1  # some are higher than 1
         liv_mstar_frac.append(_liv_mstar_frac)
 
