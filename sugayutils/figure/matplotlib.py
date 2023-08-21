@@ -280,6 +280,11 @@ class Axes(mplaxes.Axes):
             return getattr(colors, color_key)
         return color_key
 
+    def dummy(self):
+        '''Create dummy object to arange the legend order.'''
+        (dummy,) = self.plot(0, 0, ls='None', marker='', label='')
+        return dummy
+
 
 class Figure(mplfig.Figure):
     '''Wrapper of Figure'''
