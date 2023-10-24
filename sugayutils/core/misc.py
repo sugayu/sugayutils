@@ -61,3 +61,10 @@ def listup_instancevar(instance: Any):
         for attr in dir(instance)
         if not callable(getattr(instance, attr)) and not attr.startswith("__")
     ]
+
+
+def to_logerr(error: np.ndarray, value: np.ndarray) -> tuple[np.ndarray]:
+    '''Make error in logarithm.'''
+    lerr = np.log10(value) - np.log10(value - error)
+    herr = np.log10(value + error) - np.log10(value)
+    return lerr, herr

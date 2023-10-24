@@ -2,7 +2,9 @@
 '''
 from __future__ import annotations
 from typing import Iterable, Sequence
+from pathlib import Path
 import numpy as np
+import numpy.typing as npt
 import matplotlib.figure as mplfig
 import matplotlib.axes as mplaxes
 import matplotlib.pyplot as plt
@@ -289,7 +291,9 @@ class Axes(mplaxes.Axes):
 class Figure(mplfig.Figure):
     '''Wrapper of Figure'''
 
-    def subplots(self, *args, subplot_kw: dict = {}, **kwargs) -> list[Axes]:
+    def subplots(
+        self, *args, subplot_kw: dict = {}, **kwargs
+    ) -> npt.NDArray[np.object_]:
         subplot_kw.setdefault('axes_class', Axes)
         return super().subplots(subplot_kw=subplot_kw, *args, **kwargs)
 
@@ -309,6 +313,21 @@ class Figure(mplfig.Figure):
         if ax_for_autopos is not None:
             cax = autolocate_cax(cax, ax_for_autopos, kwargs.get('location', 'right'))
         return cax
+
+    def save_or_plot(self, fname: str | Path | None = None) -> None:
+        '''Save or plot figure.
+
+        Save figure with that file name. If fname=None, plt.plot figure.
+
+        Args:
+            fname (str | Path | None, optional): File name for save. Defaults to None.
+        '''
+        if fname is None:
+            plt.show()
+        elif fname:
+            self.savefig(fname)
+        plt.clf()
+        plt.close()
 
 
 def autolocate_cax(cax, ax, location='right'):
