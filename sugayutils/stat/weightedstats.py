@@ -93,13 +93,13 @@ def std(
     return np.sqrt(variance(values, weights, axis=axis, sigma=sigma))
 
 
-def fwhm(
+def gauss_fwhm(
     values: np.ndarray | u.Quantity,
     weights: np.ndarray | u.Quantity,
     axis: int | tuple[int, ...] | None = None,
     sigma: float | None = None,
 ) -> float | np.ndarray | u.Quantity:
-    '''Weighted fwhm.
+    '''Weighted fwhm computed from standard deviation assuming Gaussian.
 
     Args:
         values (np.ndarray | u.Quantity): Input values, e.g., wavelengths.
@@ -114,7 +114,7 @@ def fwhm(
 
     Examples:
         >>> from sugayutils.stat import weightedstats
-        >>> fwhm = weightedstats.fwhm(wavelength, weights=flux)
+        >>> fwhm = weightedstats.gauss_fwhm(wavelength, weights=flux)
     '''
     return (
         2.0 * np.sqrt(2.0 * np.log(2.0)) * std(values, weights, axis=axis, sigma=sigma)
@@ -157,6 +157,9 @@ def kurtosis(
 ) -> float | np.ndarray | u.Quantity:
     '''Weighted kurtosis.
 
+    This function adopts the denifition that the Gauss function has a kurtosis of zero,
+    by subtracting 3 from normalized 4th moments: E(X-mu)/sigma**4 - 3
+
     Args:
         values (np.ndarray | u.Quantity): Input values, e.g., wavelengths.
         weights (np.ndarray | u.Quantity): Weights, e.g., flux.
@@ -174,7 +177,7 @@ def kurtosis(
     '''
     norm = variance(values, weights, axis=axis) ** 2
     mom4 = moment(values, weights, order=4, axis=axis, sigma=sigma)
-    return mom4 / norm
+    return mom4 / norm - 3.0
 
 
 def _average(
