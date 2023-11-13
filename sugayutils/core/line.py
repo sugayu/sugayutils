@@ -8,38 +8,6 @@ from .misc import listup_instancevar
 __all__ = ['LineWavelengthAt', 'LineList']
 
 
-class LineWavelengthAt:
-    '''Container returning  wavelengths in the observed frame at specific redshift.
-
-    Example:
-        >>> line = LineWavelengthAt(z=1.2)
-    '''
-
-    def __init__(self, z: float = 0) -> None:
-        self.z = z
-        self.redshift()
-
-    def redshift(self) -> None:
-        '''Set observed-frame line wavelengths into the instance variables.
-
-        New instannce variables are Quality class.
-        '''
-        linelist = LineList()
-        lines = listup_instancevar(linelist)
-        for line in lines:
-            setattr(self, line, getattr(linelist, line) * (1 + self.z) * u.AA)
-
-    def asdict(self, unit: str = 'AA') -> dict:
-        '''Create line dictionary.'''
-        lines = listup_instancevar(self)
-        dictionary = {}
-        for line in lines:
-            if line == 'z':
-                continue
-            dictionary[line] = getattr(self, line).to(unit)
-        return dictionary
-
-
 @dataclass
 class LineList:
     '''Line list in vacuum.
@@ -88,3 +56,35 @@ class LineList:
     CII158 = 1577409
     NII122 = 1218976
     NII205 = 2051783
+
+
+class LineWavelengthAt(LineList):
+    '''Container returning  wavelengths in the observed frame at specific redshift.
+
+    Example:
+        >>> line = LineWavelengthAt(z=1.2)
+    '''
+
+    def __init__(self, z: float = 0) -> None:
+        self.z = z
+        self.redshift()
+
+    def redshift(self) -> None:
+        '''Set observed-frame line wavelengths into the instance variables.
+
+        New instannce variables are Quality class.
+        '''
+        linelist = LineList()
+        lines = listup_instancevar(linelist)
+        for line in lines:
+            setattr(self, line, getattr(linelist, line) * (1 + self.z) * u.AA)
+
+    def asdict(self, unit: str = 'AA') -> dict:
+        '''Create line dictionary.'''
+        lines = listup_instancevar(self)
+        dictionary = {}
+        for line in lines:
+            if line == 'z':
+                continue
+            dictionary[line] = getattr(self, line).to(unit)
+        return dictionary
