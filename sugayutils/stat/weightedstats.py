@@ -3,6 +3,7 @@
 from __future__ import annotations
 import numpy as np
 import astropy.units as u
+import warnings
 
 
 ##
@@ -228,6 +229,10 @@ def _clipped_index1d(
         avg = _average(values[index0], weights[index0])
         _std = std(values[index0], weights[index0])
         index1 = np.abs(values - avg) < sigma * _std
+
+        if np.sum(index0) < np.sum(index1):
+            warnings.warn('Sigma clipping not converged.')
+            index1 = index0
 
     return index1
 
