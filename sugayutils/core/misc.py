@@ -63,7 +63,7 @@ def listup_instancevar(instance: Any):
     ]
 
 
-def to_logerr(error: np.ndarray, value: np.ndarray) -> tuple[np.ndarray]:
+def to_logerr(error: np.ndarray, value: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     '''Make error in logarithm.'''
     lerr = np.log10(value) - np.log10(value - error)
     herr = np.log10(value + error) - np.log10(value)
