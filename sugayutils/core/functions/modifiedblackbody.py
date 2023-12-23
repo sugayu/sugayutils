@@ -1,21 +1,20 @@
 '''Modified blackbody function.
 '''
+from __future__ import annotations
 import numpy as np
 import astropy.units as u
 from astropy.modeling import models
 from astropy.cosmology import Planck18 as cosmo
-import astropy.constants as c
 
 
 ##
-# TODO: Making it class as inheritance of blackbody.
 class ModifiedBlackBody:
     '''Modified blackbody function.'''
 
     def __init__(
         self,
         Mdust: u.Quantity,
-        emissibity: float,
+        emissibity: float | np.ndarray,
         Tdust: u.Quantity,
         kappa0: u.Quantity = 30.0 * u.cm**2 / u.g,
         z: float = 0.0,
@@ -24,13 +23,11 @@ class ModifiedBlackBody:
         self.emissibity = emissibity
         self._Tdust: float
         self._blackbody: models.BlackBody
-        self.Tdust = Tdust
         self.kappa0 = kappa0
 
         self._z: float
         self._d: u.Quantity
         self._blackbody_cmb: u.Quantity
-        self.z = z
 
     @property
     def Tdust(self) -> u.Quantity:
@@ -56,7 +53,7 @@ class ModifiedBlackBody:
             self._d = cosmo.luminosity_distance(z=self._z)
 
     def execute(self, frequency: u.Quantity) -> u.Quantity:
-        '''Return intrinsic SED in units identical to luminosity.'''
+        '''Return intrinsic SED in units identical to luminosity per Hz.'''
         _frequency = frequency.to(u.Hz, u.spectral())
         _wave = frequency.to(u.um, u.spectral())
         kappa_nu = self.kappa0 * (100 * u.um / _wave) ** self.emissibity
@@ -81,7 +78,7 @@ class ModifiedBlackBody:
         lum_nu = 4.0 * np.pi * self._d**2 * self.observe(wave_obs)
         unit = u.erg / u.s / u.um
         lum_lam = lum_nu.to(unit, u.spectral_density(wave_obs))
-        return np.sum(lum_lam * 1.0 * u.um * (1 + self.z)).to(u.Lsun)
+        return np.sum(lum_lam * 1.0 * u.um * (1 + self.z), axis=-1).to(u.Lsun)
 
     def __call__(self, frequency: u.Quantity) -> u.Quantity:
         return self.execute(frequency)
