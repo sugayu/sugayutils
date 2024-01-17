@@ -314,7 +314,7 @@ class Figure(mplfig.Figure):
             cax = autolocate_cax(cax, ax_for_autopos, kwargs.get('location', 'right'))
         return cax
 
-    def save_or_plot(self, fname: str | Path | None = None) -> None:
+    def save_or_plot(self, fname: str | Path | None = None, **kwargs) -> None:
         '''Save or plot figure.
 
         Save figure with that file name. If fname=None, plt.plot figure.
@@ -323,11 +323,11 @@ class Figure(mplfig.Figure):
             fname (str | Path | None, optional): File name for save. Defaults to None.
         '''
         if fname is None:
-            plt.show()
+            plt.show(**kwargs)
         elif fname:
-            self.savefig(fname)
-        plt.clf()
-        plt.close()
+            self.savefig(fname, **kwargs)
+        self.clear()
+        plt.close(self)
 
 
 def autolocate_cax(cax, ax, location='right'):
