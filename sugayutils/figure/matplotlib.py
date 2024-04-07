@@ -256,10 +256,10 @@ class Axes(mplaxes.Axes):
         self.set_xlim(xlim)
         self.set_ylim(ylim)
 
-    def set_xylabels(self, xlabel, ylabel):
+    def set_xylabels(self, xlabel, ylabel, **kwargs):
         '''Set xlabel and ylable at the same time.'''
-        self.set_xlabel(xlabel)
-        self.set_ylabel(ylabel)
+        self.set_xlabel(xlabel, **kwargs)
+        self.set_ylabel(ylabel, **kwargs)
 
     def remove_frame(self):
         '''Remove all contents of the frame.'''

@@ -28,6 +28,7 @@ class ModifiedBlackBody:
         self._z: float
         self._d: u.Quantity
         self._blackbody_cmb: u.Quantity
+        self.z = z
 
     @property
     def Tdust(self) -> u.Quantity:

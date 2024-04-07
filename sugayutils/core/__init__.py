@@ -1,15 +1,16 @@
 '''Core directory
 '''
 from . import const
-from .const import Colors, AstroConst, colors
+from .const import *
 from . import literature
-from .literature import DustAttenuationLaw, IRXbeta
+from .literature import *
 from . import misc
-from .misc import scale, get_nearest, get_argnearest, stat
+from .misc import *
 from . import line
-from .line import LineWavelengthAt, LineList
+from .line import *
 
-__all__ = const.__all__
-__all__ += literature.__all__
-__all__ += misc.__all__
-__all__ += line.__all__
+# __all__ = []
+# __all__ += const.__all__
+# __all__ += literature.__all__
+# __all__ += misc.__all__
+# __all__ += line.__all__
