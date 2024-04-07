@@ -8,6 +8,7 @@ from . import misc
 from .misc import *
 from . import line
 from .line import *
+from . import log
 
 # __all__ = []
 # __all__ += const.__all__
