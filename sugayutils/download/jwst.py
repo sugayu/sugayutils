@@ -5,20 +5,26 @@ from logging import getLogger
 from pathlib import Path
 import numpy as np
 from astroquery.mast import Observations
-from astropy.table import vstack
+from astropy.table import Table, vstack
 from .environment import PATH_DOWNLOAD
 
 logger = getLogger(__name__)
 subdir_nirspecifu = Path('JWST/NIRSpecIFU/')
+__all__ = ['download_nirspecifu_rawdata']
 
 
 ##
 def download_nirspecifu_rawdata(
-    dryrun: bool = True, dataRights: str = 'PUBLIC', nlimit: int = 10, **kwargs
-) -> None:
+    obs=None,
+    dryrun: bool = True,
+    dataRights: str = 'PUBLIC',
+    nlimit: int = 10,
+    **kwargs,
+) -> Table:
     '''Download raw data of JWST NIRSpec IFU.
 
     Args:
+        obs: Observation table obtained by previous queries. Defaults to None.
         dryrun (bool, optional): If True, downloads are not conducted. Defaults to True.
         dataRights (str, optional): Accessibility of the data, "PUBLIC" or "".
             Defaults to 'PUBLIC'.
@@ -27,21 +33,26 @@ def download_nirspecifu_rawdata(
         kwargs (optional): Criteria to search observations.
 
     Returns:
-        None: Save downloaded files.
+        Table: Output observation table based on the input query.
+               In addition, save downloaded files.
 
     Examples:
         >>> download_nirspecifu_rawdata(proposal_id=1840)
     '''
-    obs = Observations.query_criteria(
-        instrument_name='NIRSpec/IFU', calib_level=3, dataRights=dataRights, **kwargs
-    )
-    if len(obs) > nlimit:
-        msg = (
-            f'Too many observations ({len(obs)} > {nlimit}) satisfying'
-            'the given criteria.'
+    if obs is None:
+        obs = Observations.query_criteria(
+            instrument_name='NIRSpec/IFU',
+            calib_level=3,
+            dataRights=dataRights,
+            **kwargs,
         )
-        logger.error(msg)
-        raise ValueError(msg)
+        if len(obs) > nlimit:
+            msg = (
+                f'Too many observations ({len(obs)} > {nlimit})'
+                'satisfying the given criteria.'
+            )
+            logger.error(msg)
+            raise ValueError(msg)
 
     products = []
     for _obs in obs:
@@ -52,22 +63,28 @@ def download_nirspecifu_rawdata(
         )
         products.append(p[np.where(uncal | miscs)])
     product_list = vstack(products)
-    dpath = PATH_DOWNLOAD / subdir_nirspecifu
 
-    logger.info(f'Number of observations: {len(obs)}')
-    logger.info(f'Number of products: {len(product_list)}')
+    dpath = PATH_DOWNLOAD / subdir_nirspecifu
     if dryrun:
+        logger.info(f'Number of observations: {len(obs)}')
+        for nm, fil, _id in zip(obs['target_name'], obs['filters'], obs['proposal_id']):
+            logger.info(f'PID{_id}: {fil} -- {nm}')
+        logger.info(f'Number of products: {len(product_list)}')
         for p in product_list['productFilename']:
-            logger.info(f'{dpath / p}')
+            if '.fits' in p:
+                logger.info(f'{dpath / p}')
         logger.info('These data will be moved to appropriate directries later.')
-        return
+        return obs
     else:
-        logger.info(datetime.today())
+        dpath.mkdir(exist_ok=True)
+        logger.info(f'Number of observations: {len(obs)}')
+        logger.info(f'Number of products: {len(product_list)}')
+        logger.info(f'START: {datetime.today()}')
         manifest = Observations.download_products(
             product_list, download_dir=dpath, flat=True
         )
         logger.debug(manifest)
-        logger.info(datetime.today())
+        logger.info(f'END: {datetime.today()}')
 
     now = datetime.today().strftime('%Y%m%d%H%M')
     product_list.write(dpath / f'downloads_{now}.ecsv', format='ascii.ecsv')
@@ -76,6 +93,8 @@ def download_nirspecifu_rawdata(
     for m in manifest:
         path = Path(m['Local Path'])
         info = product_list[np.where(path.name == product_list['productFilename'])]
+        obs_i = obs[np.where(obs['obsid'] == info['parent_obsid'][0])]
+        target_name = obs_i['target_name'][0]
         filtername = ''.join(info['filters'][0].split(';'))
         if path.suffix == '.fits':
             subdir = 'raw'
@@ -88,4 +107,7 @@ def download_nirspecifu_rawdata(
         elif path.suffix == '.csv':
             subdir = 'cal'
         if path.exists():
-            path.rename(path.parent / filtername / subdir / path.name)
+            newpath: Path = path.parent / target_name / filtername / subdir
+            newpath.mkdir(parents=True, exist_ok=True)
+            path.rename(path.parent / target_name / filtername / subdir / path.name)
+    return obs
