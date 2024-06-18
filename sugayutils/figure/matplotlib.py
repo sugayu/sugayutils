@@ -1,5 +1,6 @@
 '''Wrapper of Matplotlib.
 '''
+
 from __future__ import annotations
 from typing import Iterable, Sequence
 from pathlib import Path
@@ -305,14 +306,16 @@ class Figure(mplfig.Figure):
         kwargs.setdefault('axes_class', Axes)
         return super().add_subplot(*args, **kwargs)
 
-    def colorbar(self, *args, ax_for_autopos=None, **kwargs):
+    def colorbar(
+        self, mapparable, cax: Axes | None = None, ax_for_autopos=None, **kwargs
+    ):
         '''Wrapper of Color bar.
         ax_for_autopos: automatically set color bar position.
         '''
-        cax = super().colorbar(*args, **kwargs)
+        cax_ = super().colorbar(mapparable, cax=cax, **kwargs)
         if ax_for_autopos is not None:
-            cax = autolocate_cax(cax, ax_for_autopos, kwargs.get('location', 'right'))
-        return cax
+            cax_ = autolocate_cax(cax_, ax_for_autopos, kwargs.get('location', 'right'))
+        return cax_
 
     def save_or_plot(self, fname: str | Path | None = None, **kwargs) -> None:
         '''Save or plot figure.
@@ -328,6 +331,60 @@ class Figure(mplfig.Figure):
             self.savefig(fname, **kwargs)
         self.clear()
         plt.close(self)
+
+    def add_colorbar(self, mapping, axs=None, barratio: float = 0.5, **kwargs) -> None:
+        '''Add colorbars with wise mecanisms to locate a position.
+
+        Args:
+            mapping: Mapping.
+            axs: List of Axes. Defaults to None.
+            barratio: Ratio of colorbar width (or height) to the space of widths (heights)
+                of subplots. Defaults to 0.5.
+
+        Returns:
+            None:
+
+        Examples:
+            >>> fig = makefig()
+            >>> axs = fig.subplots(2, 3)
+            >>> im = axs[0].imshow(np.arange(900).reshape(30, 30))
+            >>> fig.add_colorbar(im, axs=axs)
+        '''
+
+        try:
+            axs = axs.ravel()
+            pos0 = axs[0].get_position()
+            pos_all = axs[0].get_position()
+            for ax in axs:
+                _pos = ax.get_position()
+                pos_all.x0 = min(pos_all.x0, _pos.x0)
+                pos_all.y0 = min(pos_all.y0, _pos.y0)
+                pos_all.x1 = max(pos_all.x1, _pos.x1)
+                pos_all.y1 = max(pos_all.y1, _pos.y1)
+        except AttributeError:
+            pos0 = axs.get_position()
+            pos_all = axs.get_position()
+
+        subpars = self.subplotpars
+        w = subpars.wspace * pos0.width * barratio
+        h = subpars.hspace * pos0.height * barratio
+        right = pos_all.x1
+        left = pos_all.x0
+        top = pos_all.y1
+        bottom = pos_all.y0
+        fullwidth = pos_all.width
+        fullheight = pos_all.height
+
+        loc = kwargs.get('location', 'right')
+        if loc == 'right':
+            cax = self.add_axes((right + w, bottom, w, fullheight))
+        if loc == 'top':
+            cax = self.add_axes((left, top + h, fullwidth, h))
+        if loc == 'left':
+            cax = self.add_axes((left - 2 * w, bottom, w, fullheight))
+        if loc == 'bottom':
+            cax = self.add_axes((left, bottom - 2 * h, fullwidth, h))
+        self.colorbar(mapping, cax=cax, **kwargs)
 
 
 def autolocate_cax(cax, ax, location='right'):
