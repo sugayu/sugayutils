@@ -9,5 +9,6 @@ module = [
        'astropy.*',
        'matplotlib.*',
        'statsmodels.tsa.stattools'
+       'emcee.*'
 ]
 ignore_missing_imports = true
