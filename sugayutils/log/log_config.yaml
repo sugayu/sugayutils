@@ -6,12 +6,12 @@ formatters:
 handlers:
     fileHandler:
         class: logging.FileHandler
-        level: INFO
+        # level: INFO
         formatter: myfmt
         filename: 'log.log'
     consoleHandler:
         class: logging.StreamHandler
-        level: INFO
+        # level: INFO
         formatter: myfmt
 root:
     level: INFO
