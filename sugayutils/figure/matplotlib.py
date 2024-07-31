@@ -97,7 +97,7 @@ class Axes(mplaxes.Axes):
             _kwargs['color'] = self.colorful(c)
         if ec is not None:
             _kwargs['ecolor'] = self.colorful(ec)
-        if not 'rwidth' in _kwargs:
+        if 'rwidth' not in _kwargs:
             _kwargs['rwidth'] = 0.95
         return super().hist(*args, **_kwargs)
 
@@ -332,7 +332,7 @@ class Figure(mplfig.Figure):
         self.clear()
         plt.close(self)
 
-    def add_colorbar(self, mapping, axs=None, barratio: float = 0.5, **kwargs) -> None:
+    def add_colorbar(self, mapping, axs=None, barratio: float = 0.5, barspace: float | None = None, **kwargs) -> None:
         '''Add colorbars with wise mecanisms to locate a position.
 
         Args:
@@ -364,10 +364,14 @@ class Figure(mplfig.Figure):
         except AttributeError:
             pos0 = axs.get_position()
             pos_all = axs.get_position()
+        if barspace is None:
+            barspace = barratio
 
         subpars = self.subplotpars
         w = subpars.wspace * pos0.width * barratio
         h = subpars.hspace * pos0.height * barratio
+        ws = subpars.wspace * pos0.width * barspace
+        hs = subpars.hspace * pos0.height * barspace
         right = pos_all.x1
         left = pos_all.x0
         top = pos_all.y1
@@ -377,13 +381,13 @@ class Figure(mplfig.Figure):
 
         loc = kwargs.get('location', 'right')
         if loc == 'right':
-            cax = self.add_axes((right + w, bottom, w, fullheight))
+            cax = self.add_axes((right + ws, bottom, w, fullheight))
         if loc == 'top':
-            cax = self.add_axes((left, top + h, fullwidth, h))
+            cax = self.add_axes((left, top + hs, fullwidth, h))
         if loc == 'left':
-            cax = self.add_axes((left - 2 * w, bottom, w, fullheight))
+            cax = self.add_axes((left - 2 * ws, bottom, w, fullheight))
         if loc == 'bottom':
-            cax = self.add_axes((left, bottom - 2 * h, fullwidth, h))
+            cax = self.add_axes((left, bottom - 2 * hs, fullwidth, h))
         self.colorbar(mapping, cax=cax, **kwargs)
 
 
