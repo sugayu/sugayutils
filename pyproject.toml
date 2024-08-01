@@ -8,7 +8,8 @@ module = [
        'scipy.*',
        'astropy.*',
        'matplotlib.*',
-       'statsmodels.tsa.stattools'
-       'emcee.*'
+       'statsmodels.tsa.stattools',
+       'emcee.*',
+       'reproject.*'
 ]
 ignore_missing_imports = true

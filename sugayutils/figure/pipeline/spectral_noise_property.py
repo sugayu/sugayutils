@@ -13,7 +13,7 @@ __all__ = ['fig_spectral_noise_property', 'draw_spectral_noise_property']
 
 
 ##
-def fig_spectral_noise_property(data, fname: str | Path | None = None) -> None:
+def fig_spectral_noise_property(data, fsave: str | Path | None = None) -> None:
     '''Illustrate noise properties of the input spectrum.'''
     fig = makefig(figsize=['large', 0.33])
     fig.subplots_adjust(left=0.07, bottom=0.23, top=0.87, wspace=0.27)
@@ -28,7 +28,7 @@ def fig_spectral_noise_property(data, fname: str | Path | None = None) -> None:
     axs[3].set_title(r'Auto Correlation')
     axs[3].set_xlabel(r'pixel index')
 
-    fig.save_or_plot(fname)
+    fig.save_or_plot(fsave)
 
 
 def draw_spectral_noise_property(

@@ -300,15 +300,18 @@ class Figure(mplfig.Figure):
     def subplots(
         self, *args, subplot_kw: dict = {}, **kwargs
     ) -> npt.NDArray[np.object_]:
-        subplot_kw.setdefault('axes_class', Axes)
+        if ('projection' not in subplot_kw) and ('projection' not in kwargs):
+            subplot_kw.setdefault('axes_class', Axes)
         return super().subplots(subplot_kw=subplot_kw, *args, **kwargs)
 
     def add_axes(self, *args, **kwargs) -> Axes:
-        kwargs.setdefault('axes_class', Axes)
+        if 'projection' not in kwargs:
+            kwargs.setdefault('axes_class', Axes)
         return super().add_axes(*args, **kwargs)
 
     def add_subplot(self, *args, **kwargs) -> Axes:
-        kwargs.setdefault('axes_class', Axes)
+        if 'projection' not in kwargs:
+            kwargs.setdefault('axes_class', Axes)
         return super().add_subplot(*args, **kwargs)
 
     def colorbar(
