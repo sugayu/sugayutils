@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Callable
 import numpy as np
 import astropy.units as u
-from astropy.nddata import CCDData, Cutout2D
+from astropy.nddata import NDDataArray, Cutout2D
 from astropy.wcs import WCS
 from astropy.visualization.wcsaxes import WCSAxes
 from astropy.coordinates import SkyCoord
@@ -18,7 +18,7 @@ __all__ = ['fig_image_six_stamps', 'DrawStamp']
 
 ##
 def fig_image_six_stamps(
-    fnames: list[Path],
+    data: list[NDDataArray],
     skyposition: SkyCoord,
     size: u.Quantity,
     fsave: str | Path | None = None,
@@ -27,11 +27,9 @@ def fig_image_six_stamps(
     fig = makefig(figsize=('large', 0.675))
     fig.subplots_adjust(left=0.15, wspace=0.0, hspace=0.0)
 
-    data: CCDData
     draw_stamp = DrawStamp(fig, skyposition=skyposition, size=size, nyx=(2, 3))
-    for i, f in enumerate(fnames):
-        data = CCDData.read(f)
-        ax = draw_stamp(data)
+    for i, d in enumerate(data):
+        ax = draw_stamp(d)
         ax.coords[0].set_ticks(spacing=1.5 * u.arcsec)
         draw_stamp.set_axislabels_only_at_edge(ax)
 
@@ -56,8 +54,22 @@ class DrawStamp:
         self.wcsproj: WCS
         self.norm: Callable
 
-    def __call__(self, data: CCDData, **kwargs) -> WCSAxes:
+    def __call__(
+        self,
+        data: NDDataArray | np.ndarray | Cutout2D,
+        wcs: WCS | None = None,
+        cmap: str = 'turbo',
+        **kwargs
+    ) -> WCSAxes:
         self.counter += 1
+
+        if isinstance(data, Cutout2D):
+            data = NDDataArray(data=data.data, wcs=data.wcs)
+        if isinstance(data, np.ndarray):
+            if wcs is None:
+                raise ValueError('If data is numpy.ndarray, wcs must be needed.')
+            data = NDDataArray(data=data, wcs=wcs)
+
         image = Cutout2D(data, self.skyposition, self.size)
         if self.counter == 1:
             self._set_imageconfig(image)
@@ -70,7 +82,7 @@ class DrawStamp:
             image.data,
             origin='lower',
             norm=self.norm(),
-            cmap='turbo',
+            cmap=cmap,
             transform=ax.get_transform(image.wcs),
             **kwargs,
         )
