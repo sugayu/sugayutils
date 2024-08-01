@@ -32,18 +32,8 @@ def fig_image_six_stamps(
     for i, f in enumerate(fnames):
         data = CCDData.read(f)
         ax = draw_stamp(data)
-
-        print(type(ax))
-
         ax.coords[0].set_ticks(spacing=1.5 * u.arcsec)
-        if i % 3 == 0:
-            ax.coords[1].set_axislabel('Decl. (ICRS)')
-        else:
-            ax.coords[1].set_ticklabel_visible(False)
-        if i // 3 == 1:
-            ax.coords[0].set_axislabel('R.A (ICRS)')
-        else:
-            ax.coords[0].set_ticklabel_visible(False)
+        draw_stamp.set_axislabels_only_at_edge(ax)
 
     fig.save_or_plot()
 
@@ -70,7 +60,7 @@ class DrawStamp:
         self.counter += 1
         image = Cutout2D(data, self.skyposition, self.size)
         if self.counter == 1:
-            self.set_imageconfig(image)
+            self._set_imageconfig(image)
 
         ax: WCSAxes
         ax = self.fig.add_subplot(
@@ -86,8 +76,22 @@ class DrawStamp:
         )
         return ax
 
-    def set_imageconfig(self, image: Cutout2D) -> None:
+    def _set_imageconfig(self, image: Cutout2D) -> None:
         self.wcsproj = get_wcsproj_north_is_up(self.skyposition, self.size, image=image)
         self.norm = DS9LogNorm(
             xmin=np.min(image.data) / 10.0, xmax=np.max(image.data) / 5.0
         )
+
+    def set_axislabels_only_at_edge(self, ax: WCSAxes) -> None:
+        '''Set axis labels if the current axis is at the edge of the figure.'''
+        i = self.counter - 1
+        ny, nx = self.nyx
+
+        if i % nx == 0:
+            ax.coords[1].set_axislabel('Decl. (ICRS)')
+        else:
+            ax.coords[1].set_ticklabel_visible(False)
+        if i // nx == ny - 1:
+            ax.coords[0].set_axislabel('R.A (ICRS)')
+        else:
+            ax.coords[0].set_ticklabel_visible(False)
