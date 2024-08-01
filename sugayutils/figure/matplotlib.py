@@ -4,6 +4,8 @@
 from __future__ import annotations
 from typing import Iterable, Sequence
 from pathlib import Path
+from logging import getLogger
+from fontTools.ttLib import TTCollection
 import numpy as np
 import numpy.typing as npt
 import matplotlib.figure as mplfig
@@ -14,6 +16,9 @@ import matplotlib.patheffects as path_effects
 from ..core.const import colors
 from ..core.misc import listup_instancevar
 from ..stat.kde import KDE
+
+logger = getLogger(__name__)
+
 
 __all__ = ['makefig', 'Axes', 'Figure', 'DS9LogNorm']
 
@@ -468,3 +473,25 @@ class DS9LogNorm:
         return mplcolors.FuncNorm(
             (self.log_scale, self.log_scale_inverse), vmin=_vmin, vmax=_vmax
         )
+
+
+def convert_ttc_to_ttf(font: str | Path) -> None:
+    '''Convert font files from ttc to ttf.
+
+    This function is convenent to use ttc fonts in matplotlib.
+    https://butami-study.com/python/51/
+    '''
+    if isinstance(font, str):
+        pfont = Path(f'/System/Library/Fonts/{font}.ttc')
+    else:
+        pfont = font
+    if not pfont.exists():
+        raise FileNotFoundError(f'The ttc file "{pfont}" does not exist.')
+    dsave = Path.home() / 'lib/font/'
+
+    ttc = TTCollection(pfont)
+    for ttf in ttc:
+        fname = ttf['name'].getBestFullName()
+        fsave = dsave / ttf['name'].getBestFamilyName() / f'{fname}.ttf'
+        ttf.save(fsave)
+        logger.info(f'Saved: {fsave}')
