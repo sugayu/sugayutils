@@ -4,6 +4,8 @@
 from __future__ import annotations
 from typing import Iterable, Sequence
 from pathlib import Path
+from logging import getLogger
+from fontTools.ttLib import TTCollection
 import numpy as np
 import numpy.typing as npt
 import matplotlib.figure as mplfig
@@ -14,6 +16,9 @@ import matplotlib.patheffects as path_effects
 from ..core.const import colors
 from ..core.misc import listup_instancevar
 from ..stat.kde import KDE
+
+logger = getLogger(__name__)
+
 
 __all__ = ['makefig', 'Axes', 'Figure', 'DS9LogNorm']
 
@@ -97,7 +102,7 @@ class Axes(mplaxes.Axes):
             _kwargs['color'] = self.colorful(c)
         if ec is not None:
             _kwargs['ecolor'] = self.colorful(ec)
-        if not 'rwidth' in _kwargs:
+        if 'rwidth' not in _kwargs:
             _kwargs['rwidth'] = 0.95
         return super().hist(*args, **_kwargs)
 
@@ -295,15 +300,18 @@ class Figure(mplfig.Figure):
     def subplots(
         self, *args, subplot_kw: dict = {}, **kwargs
     ) -> npt.NDArray[np.object_]:
-        subplot_kw.setdefault('axes_class', Axes)
+        if ('projection' not in subplot_kw) and ('projection' not in kwargs):
+            subplot_kw.setdefault('axes_class', Axes)
         return super().subplots(subplot_kw=subplot_kw, *args, **kwargs)
 
     def add_axes(self, *args, **kwargs) -> Axes:
-        kwargs.setdefault('axes_class', Axes)
+        if 'projection' not in kwargs:
+            kwargs.setdefault('axes_class', Axes)
         return super().add_axes(*args, **kwargs)
 
     def add_subplot(self, *args, **kwargs) -> Axes:
-        kwargs.setdefault('axes_class', Axes)
+        if 'projection' not in kwargs:
+            kwargs.setdefault('axes_class', Axes)
         return super().add_subplot(*args, **kwargs)
 
     def colorbar(
@@ -329,10 +337,18 @@ class Figure(mplfig.Figure):
             plt.show(**kwargs)
         elif fname:
             self.savefig(fname, **kwargs)
+            logger.info(f'Save fig in {fname}')
         self.clear()
         plt.close(self)
 
-    def add_colorbar(self, mapping, axs=None, barratio: float = 0.5, **kwargs) -> None:
+    def add_colorbar(
+        self,
+        mapping,
+        axs=None,
+        barratio: float = 0.5,
+        barspace: float | None = None,
+        **kwargs,
+    ) -> None:
         '''Add colorbars with wise mecanisms to locate a position.
 
         Args:
@@ -364,10 +380,14 @@ class Figure(mplfig.Figure):
         except AttributeError:
             pos0 = axs.get_position()
             pos_all = axs.get_position()
+        if barspace is None:
+            barspace = barratio
 
         subpars = self.subplotpars
         w = subpars.wspace * pos0.width * barratio
         h = subpars.hspace * pos0.height * barratio
+        ws = subpars.wspace * pos0.width * barspace
+        hs = subpars.hspace * pos0.height * barspace
         right = pos_all.x1
         left = pos_all.x0
         top = pos_all.y1
@@ -377,13 +397,13 @@ class Figure(mplfig.Figure):
 
         loc = kwargs.get('location', 'right')
         if loc == 'right':
-            cax = self.add_axes((right + w, bottom, w, fullheight))
+            cax = self.add_axes((right + ws, bottom, w, fullheight))
         if loc == 'top':
-            cax = self.add_axes((left, top + h, fullwidth, h))
+            cax = self.add_axes((left, top + hs, fullwidth, h))
         if loc == 'left':
-            cax = self.add_axes((left - 2 * w, bottom, w, fullheight))
+            cax = self.add_axes((left - 2 * ws, bottom, w, fullheight))
         if loc == 'bottom':
-            cax = self.add_axes((left, bottom - 2 * h, fullwidth, h))
+            cax = self.add_axes((left, bottom - 2 * hs, fullwidth, h))
         self.colorbar(mapping, cax=cax, **kwargs)
 
 
@@ -464,3 +484,25 @@ class DS9LogNorm:
         return mplcolors.FuncNorm(
             (self.log_scale, self.log_scale_inverse), vmin=_vmin, vmax=_vmax
         )
+
+
+def convert_ttc_to_ttf(font: str | Path) -> None:
+    '''Convert font files from ttc to ttf.
+
+    This function is convenent to use ttc fonts in matplotlib.
+    https://butami-study.com/python/51/
+    '''
+    if isinstance(font, str):
+        pfont = Path(f'/System/Library/Fonts/{font}.ttc')
+    else:
+        pfont = font
+    if not pfont.exists():
+        raise FileNotFoundError(f'The ttc file "{pfont}" does not exist.')
+    dsave = Path.home() / 'lib/font/'
+
+    ttc = TTCollection(pfont)
+    for ttf in ttc:
+        fname = ttf['name'].getBestFullName()
+        fsave = dsave / ttf['name'].getBestFamilyName() / f'{fname}.ttf'
+        ttf.save(fsave)
+        logger.info(f'Saved: {fsave}')
