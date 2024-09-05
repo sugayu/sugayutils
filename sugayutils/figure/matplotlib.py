@@ -337,10 +337,18 @@ class Figure(mplfig.Figure):
             plt.show(**kwargs)
         elif fname:
             self.savefig(fname, **kwargs)
+            logger.info(f'Save fig in {fname}')
         self.clear()
         plt.close(self)
 
-    def add_colorbar(self, mapping, axs=None, barratio: float = 0.5, barspace: float | None = None, **kwargs) -> None:
+    def add_colorbar(
+        self,
+        mapping,
+        axs=None,
+        barratio: float = 0.5,
+        barspace: float | None = None,
+        **kwargs,
+    ) -> None:
         '''Add colorbars with wise mecanisms to locate a position.
 
         Args:

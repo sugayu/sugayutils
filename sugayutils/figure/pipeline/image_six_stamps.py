@@ -33,7 +33,7 @@ def fig_image_six_stamps(
         ax.coords[0].set_ticks(spacing=1.5 * u.arcsec)
         draw_stamp.set_axislabels_only_at_edge(ax)
 
-    fig.save_or_plot()
+    fig.save_or_plot(fsave)
 
 
 class DrawStamp:
@@ -91,7 +91,7 @@ class DrawStamp:
     def _set_imageconfig(self, image: Cutout2D) -> None:
         self.wcsproj = get_wcsproj_north_is_up(self.skyposition, self.size, image=image)
         self.norm = DS9LogNorm(
-            xmin=np.min(image.data) / 10.0, xmax=np.max(image.data) / 5.0
+            xmin=np.min(image.data) / 10.0, xmax=np.max(image.data) / 2.0
         )
 
     def set_axislabels_only_at_edge(self, ax: WCSAxes) -> None:
