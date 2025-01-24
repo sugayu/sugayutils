@@ -1,6 +1,7 @@
 '''Plot utilities using WCS.
 '''
 
+from __future__ import annotations
 import numpy as np
 import astropy.units as u
 from astropy.wcs import WCS

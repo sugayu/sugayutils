@@ -2,7 +2,7 @@
 '''
 
 from __future__ import annotations
-from typing import Iterable, Sequence
+from typing import Iterable, Sequence, TypeVar
 from pathlib import Path
 from logging import getLogger
 from fontTools.ttLib import TTCollection
@@ -16,6 +16,7 @@ import matplotlib.patheffects as path_effects
 from ..core.const import colors
 from ..core.misc import listup_instancevar
 from ..stat.kde import KDE
+from . import mlmodern
 
 logger = getLogger(__name__)
 
@@ -282,10 +283,24 @@ class Axes(mplaxes.Axes):
             right=False,
         )
 
-    def colorful(self, color_key: str) -> str:
+    C = TypeVar('C', str, list)
+
+    def colorful(self, color_key: C) -> C:
         '''Get favorite colors.'''
-        if color_key in self.colornames:
-            return getattr(colors, color_key)
+        if isinstance(color_key, str):
+            if color_key in self.colornames:
+                return getattr(colors, color_key)
+            return color_key
+
+        res = []
+        if isinstance(color_key, list):
+            for c in color_key:
+                if c in self.colornames:
+                    res.append(getattr(colors, c))
+                else:
+                    res.append(color_key)
+            return res
+
         return color_key
 
     def dummy(self):
