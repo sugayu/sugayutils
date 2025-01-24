@@ -21,6 +21,7 @@ def main():
     tex2uni['micro'] = 0x00B5
     matplotlib._mathtext_data.tex2uni = tex2uni
 
+    # Change get_glyph to go around all font types.
     def next_fontname(fontname: str) -> str:
         if fontname == 'it':
             return 'rm'
