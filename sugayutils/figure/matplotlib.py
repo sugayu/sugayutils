@@ -16,6 +16,7 @@ import matplotlib.patheffects as path_effects
 from ..core.const import colors
 from ..core.misc import listup_instancevar
 from ..stat.kde import KDE
+from . import mlmodern
 
 logger = getLogger(__name__)
 
