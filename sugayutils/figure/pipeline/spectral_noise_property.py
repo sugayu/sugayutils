@@ -19,10 +19,10 @@ def fig_spectral_noise_property(data, fsave: str | Path | None = None) -> None:
     fig.subplots_adjust(left=0.07, bottom=0.23, top=0.87, wspace=0.27)
 
     axs = draw_spectral_noise_property(fig, data)
-    axs[0].set_title(r'F$_\nu/\mu$Jy')
-    axs[0].set_xlabel(r'wavelength$/\mu$m')
+    axs[0].set_title(r'F$\mathdefault{_\nu/\mu}$Jy')
+    axs[0].set_xlabel(r'wavelength$\mathdefault{/\mu}$m')
     axs[1].set_title(r'Cont-sub. S/N')
-    axs[1].set_xlabel(r'wavelength$/\mu$m')
+    axs[1].set_xlabel(r'wavelength$\mathdefault{/\mu}$m')
     axs[2].set_title(r'PDF')
     axs[2].remove_xyticklabels()
     axs[3].set_title(r'Auto Correlation')
