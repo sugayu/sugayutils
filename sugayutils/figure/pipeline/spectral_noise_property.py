@@ -3,9 +3,11 @@
 
 from __future__ import annotations
 from pathlib import Path
+import warnings
 import numpy as np
 from numpy.random import default_rng
 import numpy.typing as npt
+from astropy.stats import sigma_clip
 from statsmodels.tsa.stattools import acf
 from sugayutils.figure import makefig, Figure
 
@@ -41,18 +43,28 @@ def draw_spectral_noise_property(
     axs[0].step(data.wave, data.flux, c=c, lw=1.0)
     axs[0].step(data.wave, data.cont, c='orange', lw=1.0)
     axs[0].fill_between(data.wave, data.err, -data.err, c='bgray', zorder=0.5)
+    height = np.nanmax(data.flux) - np.nanmin(data.flux)
+    axs[0].set_ylim(
+        np.nanmin(data.flux) - height * 0.05, np.nanmax(data.flux) + height * 0.05
+    )
 
     # subtracted
-    axs[1].step(data.wave, data.subtract / data.err, c=c, lw=1.0)
+    yy = data.subtract / data.err
+    axs[1].step(data.wave, yy, c=c, lw=1.0)
     axs[1].axhline(1.0, ls='--', c='gray')
     axs[1].axhline(-1.0, ls='--', c='gray')
     axs[1].axhline(0.0, ls='-', c='gray', lw=1.0)
-    ylim = axs[1].get_ylim()
+    with warnings.catch_warnings():  # Ignore warnings
+        warnings.simplefilter('ignore')
+        data_masked, *bounds = sigma_clip(yy, sigma=5, return_bounds=True)
+    ylim = (bounds[0], bounds[1])
+    # ylim = axs[1].get_ylim()
+    axs[1].set_ylim(ylim)
     pos_axs1 = axs[1].get_position()
 
     # distribution
     axs[2].hist(
-        data.subtract / data.err,
+        yy,
         20,
         orientation='horizontal',
         c='gray',
