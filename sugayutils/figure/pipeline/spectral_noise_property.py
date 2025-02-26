@@ -20,61 +20,63 @@ def fig_spectral_noise_property(data, fsave: str | Path | None = None) -> None:
     fig = makefig(figsize=['large', 0.33])
     fig.subplots_adjust(left=0.07, bottom=0.23, top=0.87, wspace=0.27)
 
-    axs = draw_spectral_noise_property(fig, data)
-    axs[0].set_title(r'F$\mathdefault{_\nu/\mu}$Jy')
-    axs[0].set_xlabel(r'wavelength$\mathdefault{/\mu}$m')
-    axs[1].set_title(r'Cont-sub. S/N')
-    axs[1].set_xlabel(r'wavelength$\mathdefault{/\mu}$m')
-    axs[2].set_title(r'PDF')
-    axs[2].remove_xyticklabels()
-    axs[3].set_title(r'Auto Correlation')
-    axs[3].set_xlabel(r'pixel index')
+    axs0, axs1 = draw_spectral_noise_property(fig, data)
+    axs0[0, 0].set_title(r'F$\mathdefault{_\nu/\mu}$Jy')
+    axs0[0, 0].set_xlabel(r'wavelength$\mathdefault{/\mu}$m')
+    axs0[0, 1].set_title(r'Cont-sub. S/N')
+    axs0[0, 1].set_xlabel(r'wavelength$\mathdefault{/\mu}$m')
+    axs0[0, 2].set_title(r'PDF')
+    axs0[0, 2].remove_xyticklabels()
+    axs0[0, 3].set_title(r'Auto Correlation')
+    axs0[0, 3].set_xlabel(r'pixel index')
 
     fig.save_or_plot(fsave)
 
 
 def draw_spectral_noise_property(
     fig: Figure, data, c: str = 'black'
-) -> npt.NDArray[np.object_]:
+) -> tuple[npt.NDArray[np.object_], ...]:
     '''Main function to draw the figure.'''
-    axs = fig.subplots(1, 4, width_ratios=(1.0, 1.0, 0.08, 1.0))
+    axs0 = fig.subplots(2, 4, width_ratios=(1.0, 1.0, 0.08, 1.0))
+    axs1 = fig.subplots(2, 3)
 
     # spectrum
-    axs[0].step(data.wave, data.flux, c=c, lw=1.0)
-    axs[0].step(data.wave, data.cont, c='orange', lw=1.0)
-    axs[0].fill_between(data.wave, data.err, -data.err, c='bgray', zorder=0.5)
+    axs0[0, 0].step(data.wave, data.flux, c=c, lw=1.0)
+    axs0[0, 0].step(data.wave, data.cont, c='orange', lw=1.0)
+    axs0[0, 0].fill_between(data.wave, data.err, -data.err, c='bgray', zorder=0.5)
     height = np.nanmax(data.flux) - np.nanmin(data.flux)
-    axs[0].set_ylim(
+    axs0[0, 0].set_ylim(
         np.nanmin(data.flux) - height * 0.05, np.nanmax(data.flux) + height * 0.05
     )
 
     # subtracted
     yy = data.subtract / data.err
-    axs[1].step(data.wave, yy, c=c, lw=1.0)
-    axs[1].axhline(1.0, ls='--', c='gray')
-    axs[1].axhline(-1.0, ls='--', c='gray')
-    axs[1].axhline(0.0, ls='-', c='gray', lw=1.0)
+    axs0[0, 1].step(data.wave, yy, c=c, lw=1.0)
+    axs0[0, 1].axhline(1.0, ls='--', c='gray')
+    axs0[0, 1].axhline(-1.0, ls='--', c='gray')
+    axs0[0, 1].axhline(0.0, ls='-', c='gray', lw=1.0)
     with warnings.catch_warnings():  # Ignore warnings
         warnings.simplefilter('ignore')
         data_masked, *bounds = sigma_clip(yy, sigma=5, return_bounds=True)
     ylim = (bounds[0], bounds[1])
     # ylim = axs[1].get_ylim()
-    axs[1].set_ylim(ylim)
-    pos_axs1 = axs[1].get_position()
+    axs0[0, 1].set_ylim(ylim)
+    pos_axs1 = axs0[0, 1].get_position()
 
     # distribution
-    axs[2].hist(
+    axs0[0, 2].hist(
         yy,
         20,
         orientation='horizontal',
         c='gray',
         density=True,
+        range=ylim,
     )
-    axs[2].set_ylim(ylim)
+    axs0[0, 2].set_ylim(ylim)
     x = np.arange(ylim[0], ylim[1], 0.1)
-    axs[2].plot(np.exp(-0.5 * (x**2)) / np.sqrt(2 * np.pi), x, ls='--', c='black')
-    pos_axs2 = axs[2].get_position()
-    axs[2].set_position(
+    axs0[0, 2].plot(np.exp(-0.5 * (x**2)) / np.sqrt(2 * np.pi), x, ls='--', c='black')
+    pos_axs2 = axs0[0, 2].get_position()
+    axs0[0, 2].set_position(
         (pos_axs1.x1, pos_axs2.y0, pos_axs2.x1 - pos_axs1.x1, pos_axs2.height)
     )
 
@@ -86,15 +88,32 @@ def draw_spectral_noise_property(
         # nlags=len(data) - 1,
         alpha=0.05,
     )
-    ml, _, _ = axs[3].stem(
+    ml, _, _ = axs0[0, 3].stem(
         np.arange(len(_acf)),
         data.err_autocorr[: len(_acf)],
-        markerfmt=axs[3].colorful(c),
-        linefmt=axs[3].colorful('gray'),
-        basefmt=axs[3].colorful('black'),
+        markerfmt=axs0[0, 3].colorful(c),
+        linefmt=axs0[0, 3].colorful('gray'),
+        basefmt=axs0[0, 3].colorful('black'),
     )
     ml.set_markersize(1.0)
     acferr = acferr[:, 0] - _acf
-    axs[3].fill_between(np.arange(len(_acf)), acferr, -acferr, c='bgray', zorder=0.5)
+    axs0[0, 3].fill_between(
+        np.arange(len(_acf)), acferr, -acferr, c='bgray', zorder=0.5
+    )
+    axs0[1, 0].remove_frame()
+    axs0[1, 1].remove_frame()
+    axs0[1, 2].remove_frame()
+    axs0[1, 3].remove_frame()
 
-    return axs
+    # correlations
+    axs1[1, 0].scatter(yy[:-1], yy[1:], s=2**2, c='gray', mec=(1, 1, 1, 0.5), mew=0.4)
+    axs1[1, 0].text(0.1, 0.9, 'Index 1', transform=axs1[1, 0].transAxes)
+    axs1[1, 1].scatter(yy[:-2], yy[2:], s=2**2, c='gray', mec=(1, 1, 1, 0.5), mew=0.4)
+    axs1[1, 1].text(0.1, 0.9, 'Index 2', transform=axs1[1, 1].transAxes)
+    axs1[1, 2].scatter(yy[:-3], yy[3:], s=2**2, c='gray', mec=(1, 1, 1, 0.5), mew=0.4)
+    axs1[1, 2].text(0.1, 0.9, 'Index 3', transform=axs1[1, 2].transAxes)
+    axs1[0, 0].remove_frame()
+    axs1[0, 1].remove_frame()
+    axs1[0, 2].remove_frame()
+
+    return axs0, axs1
