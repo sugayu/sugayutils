@@ -1,7 +1,7 @@
 '''Download JWST data
 '''
 
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, Future
 from threading import current_thread
 from queue import Queue
 import asyncio
@@ -15,7 +15,6 @@ from .environment import PATH_DOWNLOAD
 
 logger = getLogger(__name__)
 subdir_nirspecifu = Path('JWST/NIRSpecIFU/')
-subdir_nirspecmsa = Path('JWST/NIRSpecMSA/')
 __all__ = ['download_nirspecifu_rawdata', 'download_nirspecmsa_calibdata']
 
 
@@ -156,37 +155,27 @@ def download_nirspecmsa_calibdata(
     Examples:
         >>> download_nirspecmsa_calibdata(proposal_id=1180)
     '''
-    global global_count_thread
-    global_count_thread = 0
-    dpath = PATH_DOWNLOAD / subdir_nirspecmsa
-    dpath.mkdir(exist_ok=True)
+    downloader = NIRSpecMSADownloader()
 
     if obs is None:
-        obs = Observations.query_criteria(
-            instrument_name='NIRSpec/MSA',
-            calib_level=3,
-            dataRights=dataRights,
-            **kwargs,
-        )
-        if len(obs) > nlimit:
+        downloader.query_criteria(kwargs)
+        if downloader.n_obs > nlimit:
             msg = (
-                f'Too many observations ({len(obs)} > {nlimit})'
+                f'Too many observations ({downloader.n_obs} > {nlimit})'
                 'satisfying the given criteria.'
             )
             logger.error(msg)
             raise ValueError(msg)
-    logger.info(f'Number of observations: {len(obs)}')
+    else:
+        downloader.obs = obs
+    assert isinstance(downloader.obs, Table)
+    logger.info(f'Number of observations: {downloader.n_obs}')
 
-    obslist = []
-    for i in range(len(obs) // chunksize_download + 1):
-        j0, j1 = i * chunksize_download, (i + 1) * chunksize_download
-        if j0 == len(obs):
-            break
-        j1 = j1 if j1 <= len(obs) else len(obs)
-        obslist.append(obs[j0:j1])
+    obslist = downloader.chunk_observations(chunksize_download)
 
     if dryrun:
-        product_list = get_product_list__nirspecmsa_calibdata(obslist[0])
+        product_list = downloader.get_product_list(obslist[0])
+        obs = downloader.obs
         for i, (nm, fil, _id) in enumerate(
             zip(obs['target_name'], obs['filters'], obs['proposal_id'])
         ):
@@ -197,7 +186,7 @@ def download_nirspecmsa_calibdata(
         logger.info(f'Number of products in the first chunk: {len(product_list)}')
         for i, p in enumerate(product_list['productFilename']):
             if '.fits' in p:
-                logger.info(f'{dpath / p}')
+                logger.info(f'{downloader.dpath / p}')
             if i > 100:
                 logger.info('...')
                 break
@@ -205,99 +194,163 @@ def download_nirspecmsa_calibdata(
         return obs
 
     logger.info(f'START: {datetime.today()}')
-    queue_product: Queue = Queue()
-    queue_manifest: Queue = Queue()
     with ThreadPoolExecutor(nthread) as exe1, ThreadPoolExecutor(nthread) as exe2:
-        futures_product, futures_manifest = [], []
-        for obs in obslist:
-            future = exe1.submit(
-                get_product_list__nirspecmsa_calibdata, obs, queue_product
-            )
-            futures_product.append(future)
-
-        for _ in obslist:
-            future = exe2.submit(
-                download_products__nirspecmsa_calibdata,
-                dpath,
-                queue_product,
-                queue_manifest,
-            )
-            futures_manifest.append(future)
-
-        for _ in obslist:
-            _product_list, _manifest = queue_manifest.get()
-            for m in _manifest:
-                arrange_dirs__nirspecmsa_calibdata(obs, _product_list, m)
-
-        product_list = vstack([future.result() for future in futures_product])
-        manifest = vstack([future.result() for future in futures_manifest])
+        downloader.run_get_product_list(obslist, exe1)
+        downloader.run_download_products(exe2)
+        downloader.run_arrange_dirs()
+        product_list, manifest = downloader.result()
     logger.info(f'END: {datetime.today()}')
 
-    assert queue_product.empty() is True
-    assert queue_manifest.empty() is True
+    downloader.assert_emptyqueue()
 
     logger.info('====Download results====')
     logger.info(f'Number of observations: {len(obs)}')
     logger.info(f'Number of products: {len(product_list)}')
     now = datetime.today().strftime('%Y%m%d%H%M')
-    product_list.write(dpath / f'downloads_{now}.ecsv', format='ascii.ecsv')
-    manifest.write(dpath / f'manifest_{now}.ecsv', format='ascii.ecsv')
+    downloader.write_results(now)
     logger.info(
-        f'List written in {dpath}/downloads_{now}.ecsv and /manifest_{now}.ecsv'
+        f'List written in {downloader.dpath}/downloads_{now}.ecsv and /manifest_{now}.ecsv'
     )
     logger.info('Download Done.')
     return obs
 
 
-def get_product_list__nirspecmsa_calibdata(
-    obs: Table, queue: Queue | None = None
-) -> Table:
-    '''Wrapper of Observations.get_product_list()'''
-    global global_count_thread
-    p = Observations.get_product_list(obs)
-    logger.info(
-        'Created product list in ' '{current_thread().getName()} #{global_count_thread}'
-    )
+class NIRSpecMSADownloader:
+    '''Download MSA data in multi-thread.'''
 
-    L2c = p['calib_level'] == 3
-    global_count_thread += 1
-    _p = p[np.where(L2c)]
-    if queue is not None:
-        queue.put(_p)
-    return _p
+    path_download = PATH_DOWNLOAD
+    subdir_nirspecmsa = Path('JWST/NIRSpecMSA/')
+    dataRights = 'PUBLIC'
+    instrument_name = 'NIRSpec/MSA'
 
+    def __init__(self) -> None:
+        self.count_thread: int = 0
+        self.dpath = self.path_download / self.subdir_nirspecmsa
+        self.dpath.mkdir(exist_ok=True)
+        self.obs: Table | None = None
+        self.product_list: Table | None = None
+        self.manifest: Table | None = None
+        self.queue_product: Queue = Queue()
+        self.futures_product: list[Future] = []
+        self.queue_manifest: Queue = Queue()
+        self.futures_manifest: list[Future] = []
 
-def download_products__nirspecmsa_calibdata(
-    dpath: Path, queue_product: Queue, queue_manifest: Queue
-) -> Table:
-    '''Download throught queue'''
-    product_list = queue_product.get()
-    manifest = Observations.download_products(
-        product_list, download_dir=dpath, flat=True
-    )
-    queue_manifest.put((product_list, manifest))
-    return manifest
+    def query_criteria(
+        self, insttrument_name=instrument_name, dataRights=dataRights, **kwargs
+    ) -> Table:
+        '''Return results of observations query.'''
+        self.obs = Observations.query_criteria(
+            instrument_name=insttrument_name,
+            calib_level=3,
+            dataRights=dataRights,
+            **kwargs,
+        )
 
+    def chunk_observations(self, size: int) -> list:
+        '''Make a list of chunks of queried observations.'''
+        if self.obs is None:
+            raise ValueError('obs is None.')
 
-def arrange_dirs__nirspecmsa_calibdata(
-    obs: Table, product_list: Table, manifest: Table
-) -> None:
-    path = Path(manifest['Local Path'])
-    info = product_list[np.where(path.name == product_list['productFilename'])]
-    obs_i = obs[np.where(obs['obsid'] == info['parent_obsid'][0])]
-    target_name = obs_i['target_name'][0]
-    filtername = ''.join(info['filters'][0].split(';'))
-    if path.suffix == '.fits':
-        subdir = 'product'
-    elif path.suffix == '.jpg':
-        subdir = 'images'
-    elif path.suffix == '.png':
-        subdir = 'images'
-    elif path.suffix == '.json':
-        subdir = 'cal'
-    elif path.suffix == '.csv':
-        subdir = 'cal'
-    if path.exists():
-        newpath: Path = path.parent / target_name / filtername / subdir
-        newpath.mkdir(parents=True, exist_ok=True)
-        path.rename(path.parent / target_name / filtername / subdir / path.name)
+        obslist = []
+        for i in range(self.n_obs // size + 1):
+            j0, j1 = i * size, (i + 1) * size
+            if j0 == self.n_obs:
+                break
+            j1 = j1 if j1 <= self.n_obs else self.n_obs
+            obslist.append(self.obs[j0:j1])
+        return obslist
+
+    @property
+    def n_obs(self) -> int:
+        if self.obs is None:
+            raise ValueError('obs is None.')
+        return len(self.obs)
+
+    def run_get_product_list(
+        self, obslist: list[Table], exe: ThreadPoolExecutor
+    ) -> None:
+        '''Run Observations.get_product_list in units of observation chunks.'''
+        for obs in obslist:
+            future = exe.submit(self.get_product_list, obs)
+            self.futures_product.append(future)
+
+    def get_product_list(self, obs_chunk: Table) -> Table:
+        '''Wrapper of Observations.get_product_list()'''
+        product = Observations.get_product_list(obs_chunk)
+        logger.info(
+            'Created product list in '
+            '{current_thread().getName()} #{global_count_thread}'
+        )
+
+        L2c = product['calib_level'] == 3
+        self.count_thread += 1
+        product = product[np.where(L2c)]
+        return product
+
+    def run_download_products(self, exe: ThreadPoolExecutor) -> None:
+        '''Download data in units of observation chuncks.'''
+        if not self.futures_product:
+            raise ValueError('Product list is not ready.')
+        for _ in self.futures_product:
+            future = exe.submit(self.download_products)
+            self.futures_manifest.append(future)
+
+    def download_products(self) -> Table:
+        '''Download throught queue'''
+        product_list = self.queue_product.get()
+        manifest = Observations.download_products(
+            product_list, download_dir=self.dpath, flat=True
+        )
+        self.queue_manifest.put((product_list, manifest))
+        return manifest
+
+    def run_arrange_dirs(self) -> None:
+        '''Arrange directories in threads.'''
+        for _ in self.futures_manifest:
+            _product_list, _manifest = self.queue_manifest.get()
+            for m in _manifest:
+                self.arrange_dirs(_product_list, m)
+
+    def arrange_dirs(self, product_list: Table, manifest: Table) -> None:
+        '''Arrange directory structure for downloaded data.'''
+        assert self.obs is not None
+
+        path = Path(manifest['Local Path'])
+        info = product_list[np.where(path.name == product_list['productFilename'])]
+        obs_i = self.obs[np.where(self.obs['obsid'] == info['parent_obsid'][0])]
+        target_name = obs_i['target_name'][0]
+        filtername = ''.join(info['filters'][0].split(';'))
+        if path.suffix == '.fits':
+            subdir = 'product'
+        elif path.suffix == '.jpg':
+            subdir = 'images'
+        elif path.suffix == '.png':
+            subdir = 'images'
+        elif path.suffix == '.json':
+            subdir = 'cal'
+        elif path.suffix == '.csv':
+            subdir = 'cal'
+        if path.exists():
+            newpath: Path = path.parent / target_name / filtername / subdir
+            newpath.mkdir(parents=True, exist_ok=True)
+            path.rename(path.parent / target_name / filtername / subdir / path.name)
+
+    def result(self) -> tuple[Table, Table]:
+        '''Wait results of product_list and manifest as results of download.'''
+        self.product_list = vstack([future.result() for future in self.futures_product])
+        self.manifest = vstack([future.result() for future in self.futures_manifest])
+        return self.product_list, self.manifest
+
+    def assert_emptyqueue(self) -> None:
+        assert self.queue_product.empty() is True
+        assert self.queue_manifest.empty() is True
+
+    def write_results(self, tag: str) -> None:
+        if self.product_list is None:
+            raise ValueError('Product list is not ready.')
+        if self.manifest is None:
+            raise ValueError('Manifest is not ready: Download has not been finished.')
+        self.product_list.write(
+            self.dpath / f'downloads_{tag}.ecsv', format='ascii.ecsv'
+        )
+        self.manifest.write(self.dpath / f'manifest_{tag}.ecsv', format='ascii.ecsv')
