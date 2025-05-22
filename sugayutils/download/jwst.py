@@ -4,13 +4,14 @@
 from concurrent.futures import ThreadPoolExecutor, Future
 from threading import current_thread
 from queue import Queue
-import asyncio
 from datetime import datetime
 from logging import getLogger
+import logging
 from pathlib import Path
 import numpy as np
-from astroquery.mast import Observations
+from astroquery.mast import ObservationsClass, Observations
 from astropy.table import Table, vstack
+import requests  # type:ignore
 from .environment import PATH_DOWNLOAD
 
 logger = getLogger(__name__)
@@ -19,9 +20,6 @@ __all__ = ['download_nirspecifu_rawdata', 'download_nirspecmsa_calibdata']
 
 
 ##
-global_count_thread = 0
-
-
 def download_nirspecifu_rawdata(
     obs=None,
     dryrun: bool = True,
@@ -127,8 +125,12 @@ def download_nirspecmsa_calibdata(
     dryrun: bool = True,
     dataRights: str = 'PUBLIC',
     nlimit: int = 1000,
-    nthread: int = 10,
-    chunksize_download: int = 250,
+    nthread_p: int = 10,
+    nthread_d: int = 20,
+    chunksize_download: int = 50,
+    overwrite: bool = False,
+    savetag: str = '',
+    skip_existdata: bool = True,  # Not used now
     **kwargs,
 ) -> Table:
     '''Download calibrated data of JWST NIRSpec MSA.
@@ -140,12 +142,17 @@ def download_nirspecmsa_calibdata(
             Defaults to 'PUBLIC'.
         nlimit (int, optional): Number limit of the searched observations for downloads.
             Defaults to 1000.
-        nthread (int, optional): Number of threads for downloads, but NOTE that
-            the actual number of threads is roughly x2 more than nthread, beacause
-            this function provides two download steps and both steps use as many threads
-            as nthread. Defaults to 10.
+        nthread_p (int, optional): Number of threads to get a product list.
+            Defaults to 10.
+        nthread_d (int, optional): Number of threads to download data. Defaults to 20.
         chunksize_download (int, optional): The chunksize used for deviding
-            the product list. Defaults to 250.
+            the product list. Defaults to 50.
+        overwrite (bool, optional): If True, the data will be overwrite. Otherwise,
+            the exisiting data will not be overwriten by the downloaded data and
+            warning will be reported. Defaults to False.
+        savetag (str, optional): Tag used to modify the save directory.
+        skip_existdata (bool, optional): If True, the data already downloaded will be
+            skiped. Defaults to True.
         kwargs (optional): Criteria to search observations.
 
     Returns:
@@ -155,14 +162,15 @@ def download_nirspecmsa_calibdata(
     Examples:
         >>> download_nirspecmsa_calibdata(proposal_id=1180)
     '''
-    downloader = NIRSpecMSADownloader()
+    pool_maxsize = nthread_d + nthread_p + 2  # Needed for multi-thread downloads
+    downloader = NIRSpecMSADownloader(savetag=savetag, pool_maxsize=pool_maxsize)
 
     if obs is None:
-        downloader.query_criteria(kwargs)
+        downloader.query_criteria(**kwargs)
         if downloader.n_obs > nlimit:
             msg = (
-                f'Too many observations ({downloader.n_obs} > {nlimit})'
-                'satisfying the given criteria.'
+                'Too many observations satisfying the given criteria'
+                f'({downloader.n_obs} > {nlimit}) .'
             )
             logger.error(msg)
             raise ValueError(msg)
@@ -176,30 +184,37 @@ def download_nirspecmsa_calibdata(
     if dryrun:
         product_list = downloader.get_product_list(obslist[0])
         obs = downloader.obs
-        for i, (nm, fil, _id) in enumerate(
-            zip(obs['target_name'], obs['filters'], obs['proposal_id'])
-        ):
-            logger.info(f'PID{_id}: {fil} -- {nm}')
+        for i, _obs in enumerate(obs):
+            _id, fil, name = _obs["proposal_id"], _obs["filters"], _obs["target_name"]
+            logger.info(f'PID{_id}: {fil} -- {name}')
             if i > 50:
                 logger.info('...')
                 break
-        logger.info(f'Number of products in the first chunk: {len(product_list)}')
+        logger.info(f'Number of all products in the first chunk: {len(product_list)}')
         for i, p in enumerate(product_list['productFilename']):
             if '.fits' in p:
-                logger.info(f'{downloader.dpath / p}')
+                logger.info(f'{downloader.dpath_downloading / p}')
             if i > 100:
                 logger.info('...')
                 break
-        logger.info('These data will be moved to appropriate directories later like:')
+        logger.info('These data will be moved to appropriate directories later.')
         return obs
 
+    # Ignore INFO level logger in manifest to prevent cache message.
+    current_level = logging.getLogger("astroquery").getEffectiveLevel()
+    logging.getLogger("astroquery").setLevel(logging.WARNING)
+
+    # Main task
     logger.info(f'START: {datetime.today()}')
-    with ThreadPoolExecutor(nthread) as exe1, ThreadPoolExecutor(nthread) as exe2:
+    with ThreadPoolExecutor(nthread_p) as exe1, ThreadPoolExecutor(nthread_d) as exe2:
         downloader.run_get_product_list(obslist, exe1)
         downloader.run_download_products(exe2)
-        downloader.run_arrange_dirs()
         product_list, manifest = downloader.result()
+        downloader.run_arrange_dirs()
     logger.info(f'END: {datetime.today()}')
+
+    # Back to the default level
+    logging.getLogger("astroquery").setLevel(current_level)
 
     downloader.assert_emptyqueue()
 
@@ -220,13 +235,20 @@ class NIRSpecMSADownloader:
 
     path_download = PATH_DOWNLOAD
     subdir_nirspecmsa = Path('JWST/NIRSpecMSA/')
+    subdir_tempdownload = 'tmp_download'
     dataRights = 'PUBLIC'
     instrument_name = 'NIRSpec/MSA'
 
-    def __init__(self) -> None:
+    def __init__(
+        self, savetag: str = '', skip_existdata: bool = True, pool_maxsize: int = 0
+    ) -> None:
+        self.savetag = savetag + '_' if savetag else ''
+        self.skip_existdata = skip_existdata
         self.count_thread: int = 0
         self.dpath = self.path_download / self.subdir_nirspecmsa
+        self.dpath_downloading = self.dpath / self.subdir_tempdownload
         self.dpath.mkdir(exist_ok=True)
+        self.dpath_downloading.mkdir(exist_ok=True)
         self.obs: Table | None = None
         self.product_list: Table | None = None
         self.manifest: Table | None = None
@@ -235,12 +257,16 @@ class NIRSpecMSADownloader:
         self.queue_manifest: Queue = Queue()
         self.futures_manifest: list[Future] = []
 
+        if pool_maxsize:
+            self._change_poolsize(pool_maxsize)
+        self.mast = ObservationsClass()
+
     def query_criteria(
-        self, insttrument_name=instrument_name, dataRights=dataRights, **kwargs
-    ) -> Table:
+        self, instrument_name=instrument_name, dataRights=dataRights, **kwargs
+    ) -> None:
         '''Return results of observations query.'''
-        self.obs = Observations.query_criteria(
-            instrument_name=insttrument_name,
+        self.obs = self.mast.query_criteria(
+            instrument_name=instrument_name,
             calib_level=3,
             dataRights=dataRights,
             **kwargs,
@@ -271,20 +297,22 @@ class NIRSpecMSADownloader:
     ) -> None:
         '''Run Observations.get_product_list in units of observation chunks.'''
         for obs in obslist:
-            future = exe.submit(self.get_product_list, obs)
+            future = exe.submit(self.get_product_list, obs, True)
             self.futures_product.append(future)
 
-    def get_product_list(self, obs_chunk: Table) -> Table:
+    def get_product_list(self, obs_chunk: Table, queue_up: bool = False) -> Table:
         '''Wrapper of Observations.get_product_list()'''
-        product = Observations.get_product_list(obs_chunk)
+        product = self.mast.get_product_list(obs_chunk)
         logger.info(
-            'Created product list in '
-            '{current_thread().getName()} #{global_count_thread}'
+            'Created product list in ' f'{current_thread().name} #{self.count_thread}'
         )
 
         L2c = product['calib_level'] == 3
+        excude_csvandasn = product['productType'] != 'INFO'
+        product = product[np.where(L2c & excude_csvandasn)]
+        if queue_up:
+            self.queue_product.put((self.count_thread, product))
         self.count_thread += 1
-        product = product[np.where(L2c)]
         return product
 
     def run_download_products(self, exe: ThreadPoolExecutor) -> None:
@@ -297,10 +325,18 @@ class NIRSpecMSADownloader:
 
     def download_products(self) -> Table:
         '''Download throught queue'''
-        product_list = self.queue_product.get()
-        manifest = Observations.download_products(
-            product_list, download_dir=self.dpath, flat=True
+        count_thread, product_list = self.queue_product.get()
+        # if self.skip_existdata:
+        #     product_list = self.check_exist(product_list)
+
+        manifest = self.mast.download_products(
+            product_list,
+            download_dir=self.dpath_downloading,
+            flat=True,
+            verbose=False,
         )
+
+        logger.info(f'Downloaded products in {current_thread().name} #{count_thread}')
         self.queue_manifest.put((product_list, manifest))
         return manifest
 
@@ -326,14 +362,33 @@ class NIRSpecMSADownloader:
             subdir = 'images'
         elif path.suffix == '.png':
             subdir = 'images'
-        elif path.suffix == '.json':
-            subdir = 'cal'
-        elif path.suffix == '.csv':
-            subdir = 'cal'
+        # elif path.suffix == '.json':
+        #     subdir = 'cal'
+        # elif path.suffix == '.csv':
+        #     subdir = 'cal'
         if path.exists():
-            newpath: Path = path.parent / target_name / filtername / subdir
-            newpath.mkdir(parents=True, exist_ok=True)
-            path.rename(path.parent / target_name / filtername / subdir / path.name)
+            dname = self.savetag + target_name
+            newdpath = self.dpath / dname / filtername / subdir
+            newdpath.mkdir(parents=True, exist_ok=True)
+            newpath = newdpath / path.name
+            if newpath.exists():
+                logger.warning(
+                    f'The downloaded data, {newpath}, already exists. '
+                    f'The downloaded data was not be moved from {newpath}.'
+                )
+            else:
+                path.rename(newpath)
+
+    def check_exist(self, observations: Table) -> bool:
+        '''Check whether the data exists.'''
+        obs = observations[0]
+        fname = Path(obs['dataURL'][5:]).name
+        target_name = obs['target_name']
+        dname = self.savetag + target_name
+        filtername = ''.join(obs['filters'][0].split(';'))
+        subdir = 'product'
+        newdpath = self.dpath / dname / filtername / subdir / fname
+        return newdpath.exists()
 
     def result(self) -> tuple[Table, Table]:
         '''Wait results of product_list and manifest as results of download.'''
@@ -354,3 +409,13 @@ class NIRSpecMSADownloader:
             self.dpath / f'downloads_{tag}.ecsv', format='ascii.ecsv'
         )
         self.manifest.write(self.dpath / f'manifest_{tag}.ecsv', format='ascii.ecsv')
+
+    def _change_poolsize(self, maxsize: int) -> None:
+        '''Change DEFAULT_POOLSIZE in the request package.
+
+        Default pool_maxsize is 10, but this is fewer than expected.
+        This value should be as many as the number of threads used in downloads.
+        '''
+        if not isinstance(maxsize, int):
+            raise TypeError(f'Maxsize ({maxsize}) must be int.')
+        requests.adapters.DEFAULT_POOLSIZE = maxsize
