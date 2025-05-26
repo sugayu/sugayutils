@@ -4,6 +4,7 @@
 from concurrent.futures import ThreadPoolExecutor, Future
 from threading import current_thread
 from queue import Queue
+import time
 from datetime import datetime
 from logging import getLogger
 import logging
@@ -126,8 +127,8 @@ def download_nirspecmsa_calibdata(
     dryrun: bool = True,
     dataRights: str = 'PUBLIC',
     nlimit: int = 1000,
-    nthread_p: int = 10,
-    nthread_d: int = 20,
+    nthread_p: int = 5,
+    nthread_d: int = 10,
     chunksize_download: int = 50,
     overwrite: bool = False,
     savetag: str = '',
@@ -220,7 +221,7 @@ def download_nirspecmsa_calibdata(
     downloader.assert_emptyqueue()
 
     logger.info('====Download results====')
-    logger.info(f'Number of observations: {len(obs)}')
+    logger.info(f'Number of observations: {len(downloader.obs)}')
     logger.info(f'Number of products: {len(product_list)}')
     now = datetime.today().strftime('%Y%m%d%H%M')
     downloader.write_results(now)
@@ -240,6 +241,7 @@ class NIRSpecMSADownloader:
     dataRights = 'PUBLIC'
     instrument_name = 'NIRSpec/MSA'
     max_retries = 3
+    time_limit = 10 * 60  # second
 
     def __init__(
         self, savetag: str = '', skip_existdata: bool = True, pool_maxsize: int = 0
@@ -308,6 +310,7 @@ class NIRSpecMSADownloader:
     ) -> Table:
         '''Wrapper of Observations.get_product_list()'''
         tries = 1
+        t0 = time.time()
         while tries <= retries:
             tries += 1
             try:
@@ -320,8 +323,15 @@ class NIRSpecMSADownloader:
                     )
                     raise e
                 logger.info(
-                    'Retry to Create product list in ' f'{current_thread().name}'
+                    'Retry to Create product list in '
+                    f'{current_thread().name} after 5 min. sleep.'
                 )
+                time.sleep(5 * 60)
+        t1 = time.time()
+
+        if (t1 - t0) > self.time_limit:
+            logger.info(f'Taking over {self.time_limit/60:.1f} min. Sleep 5 min.')
+            time.sleep(5 * 60)
 
         count_thread = self.count_thread
         self.count_thread += 1
@@ -421,15 +431,18 @@ class NIRSpecMSADownloader:
         assert self.queue_product.empty() is True
         assert self.queue_manifest.empty() is True
 
-    def write_results(self, tag: str) -> None:
+    def write_results(self, tag: str, savetag: str = '') -> None:
         if self.product_list is None:
             raise ValueError('Product list is not ready.')
         if self.manifest is None:
             raise ValueError('Manifest is not ready: Download has not been finished.')
+
         self.product_list.write(
-            self.dpath / f'downloads_{tag}.ecsv', format='ascii.ecsv'
+            self.dpath / (self.savetag + f'downloads_{tag}.ecsv'), format='ascii.ecsv'
         )
-        self.manifest.write(self.dpath / f'manifest_{tag}.ecsv', format='ascii.ecsv')
+        self.manifest.write(
+            self.dpath / (self.savetag + f'manifest_{tag}.ecsv'), format='ascii.ecsv'
+        )
 
     def _change_poolsize(self, maxsize: int) -> None:
         '''Change DEFAULT_POOLSIZE in the request package.
