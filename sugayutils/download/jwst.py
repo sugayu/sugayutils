@@ -9,8 +9,9 @@ from logging import getLogger
 import logging
 from pathlib import Path
 import numpy as np
-from astroquery.mast import ObservationsClass, Observations
 from astropy.table import Table, vstack
+from astroquery.mast import ObservationsClass, Observations
+from astroquery.exceptions import RemoteServiceError
 import requests  # type:ignore
 from .environment import PATH_DOWNLOAD
 
@@ -238,6 +239,7 @@ class NIRSpecMSADownloader:
     subdir_tempdownload = 'tmp_download'
     dataRights = 'PUBLIC'
     instrument_name = 'NIRSpec/MSA'
+    max_retries = 3
 
     def __init__(
         self, savetag: str = '', skip_existdata: bool = True, pool_maxsize: int = 0
@@ -257,9 +259,10 @@ class NIRSpecMSADownloader:
         self.queue_manifest: Queue = Queue()
         self.futures_manifest: list[Future] = []
 
-        if pool_maxsize:
-            self._change_poolsize(pool_maxsize)
         self.mast = ObservationsClass()
+        if pool_maxsize:
+            self.modify_sessions(pool_maxsize, self.max_retries)
+        # self.mast._parse_result = self._parse_result_modified
 
     def query_criteria(
         self, instrument_name=instrument_name, dataRights=dataRights, **kwargs
@@ -300,19 +303,37 @@ class NIRSpecMSADownloader:
             future = exe.submit(self.get_product_list, obs, True)
             self.futures_product.append(future)
 
-    def get_product_list(self, obs_chunk: Table, queue_up: bool = False) -> Table:
+    def get_product_list(
+        self, obs_chunk: Table, queue_up: bool = False, retries: int = max_retries
+    ) -> Table:
         '''Wrapper of Observations.get_product_list()'''
-        product = self.mast.get_product_list(obs_chunk)
+        tries = 1
+        while tries <= retries:
+            tries += 1
+            try:
+                product = self.mast.get_product_list(obs_chunk)
+            except (TimeoutError, RemoteServiceError) as e:
+                if tries > retries:
+                    logger.exception(
+                        f'Number of tries has exceeeded the max retries ({retries}) '
+                        f'in {current_thread().name}.'
+                    )
+                    raise e
+                logger.info(
+                    'Retry to Create product list in ' f'{current_thread().name}'
+                )
+
+        count_thread = self.count_thread
+        self.count_thread += 1
         logger.info(
-            'Created product list in ' f'{current_thread().name} #{self.count_thread}'
+            'Created product list in ' f'{current_thread().name} #{count_thread}'
         )
 
         L2c = product['calib_level'] == 3
         excude_csvandasn = product['productType'] != 'INFO'
         product = product[np.where(L2c & excude_csvandasn)]
         if queue_up:
-            self.queue_product.put((self.count_thread, product))
-        self.count_thread += 1
+            self.queue_product.put((count_thread, product))
         return product
 
     def run_download_products(self, exe: ThreadPoolExecutor) -> None:
@@ -415,7 +436,57 @@ class NIRSpecMSADownloader:
 
         Default pool_maxsize is 10, but this is fewer than expected.
         This value should be as many as the number of threads used in downloads.
+
+        NOTE:
+            This is deprecated because it's meaningless to change global variables
+            after defining the class that uses the variables as default arguments.
         '''
         if not isinstance(maxsize, int):
             raise TypeError(f'Maxsize ({maxsize}) must be int.')
         requests.adapters.DEFAULT_POOLSIZE = maxsize
+        # This is Omake.
+        requests.adapters.DEFAULT_RETRIES = 3
+
+    def modify_sessions(self, maxsize: int, max_retries: int) -> None:
+        self.mast._session.adapters['https://']._pool_maxsize = maxsize
+        self.mast._session.adapters['https://']._pool_connections = maxsize
+        self.mast._session.adapters['https://'].max_retries = max_retries
+        self.mast._session.adapters['https://'].init_poolmanager(
+            maxsize, maxsize, max_retries
+        )
+        self.mast._session.adapters['http://']._maxsize = maxsize
+        self.mast._session.adapters['http://']._pool_connections = maxsize
+        self.mast._session.adapters['http://'].max_retries = max_retries
+        self.mast._session.adapters['http://'].init_poolmanager(
+            maxsize, maxsize, max_retries
+        )
+
+    # def _parse_result_modified(self, responses, *, verbose=False) -> Table:
+    #     '''Same as _portal_api_connection._parse_result'''
+    #     connection = self.mast._portal_api_connection
+    #     result_list = []
+
+    #     # loading the columns config
+    #     col_config = None
+    #     if connection._current_service:
+    #         col_config = connection._column_configs.get(connection._current_service)
+    #         connection._current_service = None  # clearing current service
+
+    #     for resp in responses:
+    #         result = resp.json()
+
+    #         # check for error message
+    #         if result['status'] == "ERROR":
+    #             raise RemoteServiceError(
+    #                 result.get('msg', "There was an error with your request.")
+    #             )
+
+    #         result_table = _json_to_table(result, col_config)
+    #         result_list.append(result_table)
+
+    #     all_results = vstack(result_list)
+
+    #     # Check for no results
+    #     if not all_results:
+    #         logger.warning("Query returned no results.")
+    #     return all_results
