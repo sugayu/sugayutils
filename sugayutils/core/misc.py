@@ -1,5 +1,6 @@
 ''' miscellaneous
 '''
+
 import numpy as np
 from typing import Any
 
@@ -68,3 +69,18 @@ def to_logerr(error: np.ndarray, value: np.ndarray) -> tuple[np.ndarray, np.ndar
     lerr = np.log10(value) - np.log10(value - error)
     herr = np.log10(value + error) - np.log10(value)
     return lerr, herr
+
+
+def upsampling1d(grid: np.ndarray, rate_upsampling: int) -> np.ndarray:
+    '''Make grids up-sampling.
+
+    Args:
+        grid (np.ndarray):
+        rate_upsampling (int):
+    '''
+    if rate_upsampling == 1:
+        return grid
+    nbins_to = len(grid) * rate_upsampling
+    normgrid = (grid - grid.min()) / (grid.max() - grid.min()) * len(grid)
+    res = np.linspace(normgrid[0] - 0.5, normgrid[-1] + 0.5, (nbins_to) * 2 + 1)[1:-1:2]
+    return res * (grid.max() - grid.min()) / len(grid) + grid.min()
