@@ -146,8 +146,8 @@ def download_nirspecmsa_calibdata(
         nlimit (int, optional): Number limit of the searched observations for downloads.
             Defaults to 1000.
         nthread_p (int, optional): Number of threads to get a product list.
-            Defaults to 10.
-        nthread_d (int, optional): Number of threads to download data. Defaults to 20.
+            Defaults to 5.
+        nthread_d (int, optional): Number of threads to download data. Defaults to 10.
         chunksize_download (int, optional): The chunksize used for deviding
             the product list. Defaults to 50.
         overwrite (bool, optional): If True, the data will be overwrite. Otherwise,
@@ -234,7 +234,13 @@ def download_nirspecmsa_calibdata(
 
 
 class NIRSpecMSADownloader:
-    '''Download MSA data in multi-thread.'''
+    '''Download MSA data in multi-thread.
+
+    TODO:
+        - To devide run_get_product_list into
+            - run_get_product_list and
+            - get_product list_via_queue
+    '''
 
     path_download = PATH_DOWNLOAD
     subdir_nirspecmsa = Path('JWST/NIRSpecMSA/')
