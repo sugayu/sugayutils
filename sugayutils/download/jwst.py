@@ -133,6 +133,7 @@ def download_nirspecmsa_calibdata(
     overwrite: bool = False,
     savetag: str = '',
     skip_existdata: bool = True,  # Not used now
+    cache: bool = True,
     **kwargs,
 ) -> Table:
     '''Download calibrated data of JWST NIRSpec MSA.
@@ -210,7 +211,7 @@ def download_nirspecmsa_calibdata(
     logger.info(f'START: {datetime.today()}')
     with ThreadPoolExecutor(nthread_p) as exe1, ThreadPoolExecutor(nthread_d) as exe2:
         downloader.run_get_product_list(obslist, exe1)
-        downloader.run_download_products(exe2)
+        downloader.run_download_products(exe2, cache)
         product_list, manifest = downloader.result()
         downloader.run_arrange_dirs()
     logger.info(f'END: {datetime.today()}')
@@ -306,15 +307,21 @@ class NIRSpecMSADownloader:
             self.futures_product.append(future)
 
     def get_product_list(
-        self, obs_chunk: Table, queue_up: bool = False, retries: int = max_retries
+        self,
+        obs_chunk: Table,
+        queue_up: bool = False,
+        retries: int = max_retries,
     ) -> Table:
         '''Wrapper of Observations.get_product_list()'''
-        tries = 1
+        tries = 0
+        product: Table | None = None
         t0 = time.time()
-        while tries <= retries:
+        while product is None:
             tries += 1
             try:
+                logger.debug(f'{current_thread().name}: Producing...')
                 product = self.mast.get_product_list(obs_chunk)
+                logger.debug(f'{current_thread().name}: Produce End')
             except (TimeoutError, RemoteServiceError) as e:
                 if tries > retries:
                     logger.exception(
@@ -323,7 +330,7 @@ class NIRSpecMSADownloader:
                     )
                     raise e
                 logger.info(
-                    'Retry to Create product list in '
+                    f'Retry #{retries} to create product list in '
                     f'{current_thread().name} after 5 min. sleep.'
                 )
                 time.sleep(5 * 60)
@@ -346,26 +353,35 @@ class NIRSpecMSADownloader:
             self.queue_product.put((count_thread, product))
         return product
 
-    def run_download_products(self, exe: ThreadPoolExecutor) -> None:
+    def run_download_products(
+        self, exe: ThreadPoolExecutor, cache: bool = True
+    ) -> None:
         '''Download data in units of observation chuncks.'''
         if not self.futures_product:
             raise ValueError('Product list is not ready.')
         for _ in self.futures_product:
-            future = exe.submit(self.download_products)
+            future = exe.submit(self.download_products, cache)
             self.futures_manifest.append(future)
 
-    def download_products(self) -> Table:
+    def download_products(self, cache: bool = True) -> Table:
         '''Download throught queue'''
+
         count_thread, product_list = self.queue_product.get()
         # if self.skip_existdata:
         #     product_list = self.check_exist(product_list)
 
-        manifest = self.mast.download_products(
-            product_list,
-            download_dir=self.dpath_downloading,
-            flat=True,
-            verbose=False,
-        )
+        logger.debug(f'{current_thread().name}: Downloading...')
+        try:
+            manifest = self.mast.download_products(
+                product_list,
+                download_dir=self.dpath_downloading,
+                flat=True,
+                verbose=False,
+                cache=cache,
+            )
+        except Exception as e:
+            raise e
+        logger.debug(f'{current_thread().name}: Download End')
 
         logger.info(f'Downloaded products in {current_thread().name} #{count_thread}')
         self.queue_manifest.put((product_list, manifest))
@@ -461,18 +477,17 @@ class NIRSpecMSADownloader:
         requests.adapters.DEFAULT_RETRIES = 3
 
     def modify_sessions(self, maxsize: int, max_retries: int) -> None:
-        self.mast._session.adapters['https://']._pool_maxsize = maxsize
-        self.mast._session.adapters['https://']._pool_connections = maxsize
-        self.mast._session.adapters['https://'].max_retries = max_retries
-        self.mast._session.adapters['https://'].init_poolmanager(
-            maxsize, maxsize, max_retries
-        )
-        self.mast._session.adapters['http://']._maxsize = maxsize
-        self.mast._session.adapters['http://']._pool_connections = maxsize
-        self.mast._session.adapters['http://'].max_retries = max_retries
-        self.mast._session.adapters['http://'].init_poolmanager(
-            maxsize, maxsize, max_retries
-        )
+        session = self.mast._session.adapters['https://']
+        session._pool_maxsize = maxsize
+        session._pool_connections = maxsize
+        session.max_retries = max_retries
+        session.init_poolmanager(maxsize, maxsize, session._pool_block)
+
+        session = self.mast._session.adapters['http://']
+        session._maxsize = maxsize
+        session._pool_connections = maxsize
+        session.max_retries = max_retries
+        session.init_poolmanager(maxsize, maxsize, session._pool_block)
 
     # def _parse_result_modified(self, responses, *, verbose=False) -> Table:
     #     '''Same as _portal_api_connection._parse_result'''
