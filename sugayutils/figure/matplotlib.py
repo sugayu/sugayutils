@@ -458,6 +458,9 @@ def makefig(**kwargs) -> Figure:
     _kwargs = kwargs.copy()
     if ('figsize' in kwargs) and ('a4' in kwargs['figsize']):
         _kwargs['figsize'] = (8.27, 11.69)
+    if ('figsize' in kwargs) and ('a4l' in kwargs['figsize']):
+        # landscape
+        _kwargs['figsize'] = (11.69, 8.27)
     if ('figsize' in kwargs) and ('small' in kwargs['figsize']):
         _kwargs['figsize'] = (3.5, 3.5 * kwargs['figsize'][1])
     if ('figsize' in kwargs) and ('large' in kwargs['figsize']):
