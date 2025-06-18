@@ -10,6 +10,10 @@ import numpy.typing as npt
 from astropy.stats import sigma_clip
 from statsmodels.tsa.stattools import acf
 from sugayutils.figure import makefig, Figure
+from logging import getLogger
+
+logger = getLogger(__name__)
+
 
 __all__ = ['fig_spectral_noise_property', 'draw_spectral_noise_property']
 
@@ -45,6 +49,15 @@ def draw_spectral_noise_property(
     axs0[0, 0].step(data.wave, data.cont, c='orange', lw=1.0)
     axs0[0, 0].fill_between(data.wave, data.err, -data.err, c='bgray', zorder=0.5)
     height = np.nanmax(data.flux) - np.nanmin(data.flux)
+    if hasattr(data, 'mask'):
+        axs0[0, 0].fill_between(
+            *(data.wave, 0, 1),
+            where=data.mask,
+            c='bgray',
+            transform=axs0[0, 0].get_xaxis_transform(),
+            ec='None',
+            zorder=-1,
+        )
     axs0[0, 0].set_ylim(
         np.nanmin(data.flux) - height * 0.05, np.nanmax(data.flux) + height * 0.05
     )
@@ -55,9 +68,25 @@ def draw_spectral_noise_property(
     axs0[0, 1].axhline(1.0, ls='--', c='gray')
     axs0[0, 1].axhline(-1.0, ls='--', c='gray')
     axs0[0, 1].axhline(0.0, ls='-', c='gray', lw=1.0)
+    if hasattr(data, 'mask'):
+        axs0[0, 1].fill_between(
+            *(data.wave, 0, 1),
+            where=data.mask,
+            c='bgray',
+            transform=axs0[0, 1].get_xaxis_transform(),
+            ec='None',
+            zorder=-1,
+        )
+        _yy = np.copy(yy)
+        _yy[~data.mask.astype(bool)] = np.nan
+        axs0[0, 1].step(data.wave, _yy, c='gray', lw=1.0)
+        yy = yy[~data.mask.astype(bool)]
     with warnings.catch_warnings():  # Ignore warnings
         warnings.simplefilter('ignore')
         data_masked, *bounds = sigma_clip(yy, sigma=5, return_bounds=True)
+    if bounds[1] - bounds[0] > 40:
+        bounds = (-20, 20)
+        logger.warning('Too large bounds. Sigma clipping may be failed.')
     ylim = (bounds[0], bounds[1])
     # ylim = axs[1].get_ylim()
     axs0[0, 1].set_ylim(ylim)
