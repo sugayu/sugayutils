@@ -74,7 +74,6 @@ class CornerPlotter:
         '''Main function.'''
 
         axs = fig.subplots(self.shape[1], self.shape[1])
-        marker_size = self.get_markersize(fig, axs[0, 0], self.shape[0])
 
         for ncol in range(self.shape[1]):
             column = self.data[:, ncol]
@@ -91,7 +90,7 @@ class CornerPlotter:
 
                 row = self.data[:, nrow]
                 if self.is_lowertriangle(ncol, nrow):
-                    self.scatter(ax, column, row, ncol, nrow, s=marker_size)
+                    self.scatter(ax, column, row, ncol, nrow)
 
                 if ncol > 0:
                     ax.remove_yticklabel()
@@ -165,8 +164,6 @@ class CornerPlotter:
         row: np.ndarray,
         ncol: int,
         nrow: int,
-        *,
-        s: float = 3**2,
     ) -> None:
         '''Scatter plot in lower triangle panels.'''
 
@@ -178,7 +175,7 @@ class CornerPlotter:
         counts, xedges, yedges = np.histogram2d(
             column, row, self.nbins_scatter, range=range_
         )
-        ax.scatter(column, row, s=s, c='gray', mec='None', alpha=0.4)
+        ax.scatter(column, row, c='gray', mec='None', alpha=0.4)
 
         # counts = gaussian_filter(counts, 0.4)
         # while counts.max() > 30:
@@ -254,23 +251,5 @@ class CornerPlotter:
             self.kdehist = kdehist
         if kde2d is not None:
             self.kde2d = kde2d
-
-    @staticmethod
-    def get_markersize(
-        fig: Figure, ax: Axes, ndata: int, scale_factor: float = 2.0
-    ) -> float:
-        '''Gvie an appropreate markersize.'''
-        width_inch_fig = fig.bbox_inches.width
-        scale_w = ax.get_position().width
-        height_inch_fig = fig.bbox_inches.height
-        scale_h = ax.get_position().height
-
-        width_inch = width_inch_fig * scale_w
-        height_inch = height_inch_fig * scale_h
-        area_inch = width_inch * height_inch / ndata / 4 * np.pi
-        area_inch *= 72 * 72
-
-        area_inch *= scale_factor
-        return area_inch
 
     __call__ = cornerplot

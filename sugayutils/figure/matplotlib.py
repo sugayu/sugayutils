@@ -70,7 +70,34 @@ class Axes(mplaxes.Axes):
             _kwargs['linewidths'] = mew
         if m is not None:
             _kwargs['marker'] = m
+        if 's' not in _kwargs:
+            fig = self.figure
+            assert isinstance(fig, mplfig.Figure)
+            ms = self.get_markersize(fig, self, len(args[0]))
+            _kwargs['s'] = ms
+
         return super().scatter(*args, **_kwargs)
+
+    @staticmethod
+    def get_markersize(
+        fig: Figure | mplfig.Figure,
+        ax: Axes | mplaxes.Axes,
+        ndata: int,
+        scale_factor: float = 2.0,
+    ) -> float:
+        '''Gvie an appropreate markersize.'''
+        width_inch_fig = fig.bbox_inches.width
+        scale_w = ax.get_position().width
+        height_inch_fig = fig.bbox_inches.height
+        scale_h = ax.get_position().height
+
+        width_inch = width_inch_fig * scale_w
+        height_inch = height_inch_fig * scale_h
+        area_inch = width_inch * height_inch / ndata / 4 * np.pi
+        area_inch *= 72 * 72
+
+        area_inch *= scale_factor
+        return area_inch
 
     def errorbar(
         self,
