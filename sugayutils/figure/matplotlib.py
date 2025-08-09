@@ -110,9 +110,9 @@ class Axes(mplaxes.Axes):
     def contour(
         self,
         *args,
-        c: str | None = None,
-        lw: str | None = None,
-        ls: str | None = None,
+        c: str | list[str] | None = None,
+        lw: float | list[float] | None = None,
+        ls: str | list[str] | None = None,
         **kwargs,
     ):
         '''Wrapper of plot'''
@@ -283,7 +283,7 @@ class Axes(mplaxes.Axes):
             right=False,
         )
 
-    C = TypeVar('C', str, list)
+    C = TypeVar('C', str, list[str], str | list[str])
 
     def colorful(self, color_key: C) -> C:
         '''Get favorite colors.'''
