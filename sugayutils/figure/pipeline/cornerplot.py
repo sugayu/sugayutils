@@ -8,6 +8,9 @@ import numpy.typing as npt
 from scipy.stats import gaussian_kde, norm
 from .. import makefig, Figure, Axes
 from ...stat.kde import KDE
+from logging import getLogger
+
+logger = getLogger(__name__)
 
 
 ___all__ = ['fig_cornerplot', 'Cornerplot']
@@ -48,9 +51,12 @@ class CornerPlotter:
         if colnames is not None:
             if len(colnames) != self.shape[1]:
                 raise ValueError(
-                    'The length of colnames needs to match the shape[1] of data.'
+                    f'The length of colnames, {len(colnames)}, '
+                    f'needs to match the shape[1] of data {self.shape[1]}.'
                 )
-        self.colnames = [''] * self.shape[1]
+            self.colnames = colnames
+        else:
+            self.colnames = [''] * self.shape[1]
         self.limits: list[tuple[float, float]] | list[tuple[None, None]]
         if limits is not None:
             if len(limits) != self.shape[1]:
@@ -86,7 +92,7 @@ class CornerPlotter:
 
                 if self.is_diagonal(ncol, nrow):
                     self.histogram(ax, column, ncol)
-                    ax.set_title(self.colnames[ncol], fontsize='x-small')
+                    ax.set_title(self.colnames[ncol], fontsize='small')
 
                 row = self.data[:, nrow]
                 if self.is_lowertriangle(ncol, nrow):
@@ -122,12 +128,14 @@ class CornerPlotter:
         )
 
         if self.kdehist:
-            kernel = KDE(column)
-            xx = np.linspace(_range[0], _range[1], self.npix_kde)
-            counts = kernel(xx, lim=self.limits[ncol])
+            try:
+                kernel = KDE(column)
+                xx = np.linspace(_range[0], _range[1], self.npix_kde)
+                counts = kernel(xx, lim=self.limits[ncol])
+                ax.plot(xx, counts, c='gray', lw=1.0)
+            except np.linalg.LinAlgError:
+                logger.exception(f'The KDE line cannot be drawn at col {ncol}.')
             # * (edges[1] - edges[0]) * len(column)
-
-            ax.plot(xx, counts, c='gray', lw=1.0)
 
         ax.remove_yticklabel()
         ax.set_xlim(_range)
@@ -175,7 +183,7 @@ class CornerPlotter:
         counts, xedges, yedges = np.histogram2d(
             column, row, self.nbins_scatter, range=range_
         )
-        ax.scatter(column, row, c='gray', mec='None', alpha=0.4)
+        ax.scatter(column, row, c='gray', mec='None', alpha=0.4, scale_factor=0.5)
 
         # counts = gaussian_filter(counts, 0.4)
         # while counts.max() > 30:

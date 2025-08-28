@@ -54,15 +54,16 @@ class Axes(mplaxes.Axes):
     def scatter(
         self,
         *args,
-        c: str | Iterable | None = None,
         mec: str | Iterable | None = None,
         mew: float | Iterable | None = None,
         m: str | None = None,
+        scale_factor: float = 0.1,
         **kwargs,
     ):
         '''Wrapper of scatter'''
         _kwargs = kwargs.copy()
-        if c is not None:
+        if 'c' in _kwargs:
+            c = _kwargs['c']
             _kwargs['c'] = self.colorful(c) if isinstance(c, str) else c
         if mec is not None:
             _kwargs['edgecolors'] = self.colorful(mec) if isinstance(mec, str) else mec
@@ -73,7 +74,7 @@ class Axes(mplaxes.Axes):
         if 's' not in _kwargs:
             fig = self.figure
             assert isinstance(fig, mplfig.Figure)
-            ms = self.get_markersize(fig, self, len(args[0]))
+            ms = self.get_markersize(fig, self, len(args[0]), scale_factor)
             _kwargs['s'] = ms
 
         return super().scatter(*args, **_kwargs)
