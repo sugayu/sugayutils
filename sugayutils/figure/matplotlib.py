@@ -54,15 +54,16 @@ class Axes(mplaxes.Axes):
     def scatter(
         self,
         *args,
-        c: str | Iterable | None = None,
         mec: str | Iterable | None = None,
         mew: float | Iterable | None = None,
         m: str | None = None,
+        scale_factor: float = 0.1,
         **kwargs,
     ):
         '''Wrapper of scatter'''
         _kwargs = kwargs.copy()
-        if c is not None:
+        if 'c' in _kwargs:
+            c = _kwargs['c']
             _kwargs['c'] = self.colorful(c) if isinstance(c, str) else c
         if mec is not None:
             _kwargs['edgecolors'] = self.colorful(mec) if isinstance(mec, str) else mec
@@ -70,7 +71,34 @@ class Axes(mplaxes.Axes):
             _kwargs['linewidths'] = mew
         if m is not None:
             _kwargs['marker'] = m
+        if 's' not in _kwargs:
+            fig = self.figure
+            assert isinstance(fig, mplfig.Figure)
+            ms = self.get_markersize(fig, self, len(args[0]), scale_factor)
+            _kwargs['s'] = ms
+
         return super().scatter(*args, **_kwargs)
+
+    @staticmethod
+    def get_markersize(
+        fig: Figure | mplfig.Figure,
+        ax: Axes | mplaxes.Axes,
+        ndata: int,
+        scale_factor: float = 2.0,
+    ) -> float:
+        '''Gvie an appropreate markersize.'''
+        width_inch_fig = fig.bbox_inches.width
+        scale_w = ax.get_position().width
+        height_inch_fig = fig.bbox_inches.height
+        scale_h = ax.get_position().height
+
+        width_inch = width_inch_fig * scale_w
+        height_inch = height_inch_fig * scale_h
+        area_inch = width_inch * height_inch / ndata / 4 * np.pi
+        area_inch *= 72 * 72
+
+        area_inch *= scale_factor
+        return area_inch
 
     def errorbar(
         self,
@@ -110,9 +138,9 @@ class Axes(mplaxes.Axes):
     def contour(
         self,
         *args,
-        c: str | None = None,
-        lw: str | None = None,
-        ls: str | None = None,
+        c: str | list[str] | None = None,
+        lw: float | list[float] | None = None,
+        ls: str | list[str] | None = None,
         **kwargs,
     ):
         '''Wrapper of plot'''
@@ -283,7 +311,7 @@ class Axes(mplaxes.Axes):
             right=False,
         )
 
-    C = TypeVar('C', str, list)
+    C = TypeVar('C', str, list[str], str | list[str])
 
     def colorful(self, color_key: C) -> C:
         '''Get favorite colors.'''

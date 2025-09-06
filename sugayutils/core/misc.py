@@ -84,3 +84,15 @@ def upsampling1d(grid: np.ndarray, rate_upsampling: int) -> np.ndarray:
     normgrid = (grid - grid.min()) / (grid.max() - grid.min()) * len(grid)
     res = np.linspace(normgrid[0] - 0.5, normgrid[-1] + 0.5, (nbins_to) * 2 + 1)[1:-1:2]
     return res * (grid.max() - grid.min()) / len(grid) + grid.min()
+
+
+def finitediff(array: np.ndarray) -> np.ndarray:
+    '''Get separations of data points.
+
+    The edges of the data array is treated in the same way as the data point one step inside.
+    '''
+    mid_array = (array[1:] + array[:-1]) / 2.0
+    d_array = mid_array[1:] - mid_array[:-1]
+    edge0 = (mid_array[0] - array[0]) * 2
+    edge1 = (array[-1] - mid_array[-1]) * 2
+    return np.concatenate(((edge0,), d_array, (edge1,)))
