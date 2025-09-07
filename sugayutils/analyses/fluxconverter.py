@@ -36,8 +36,8 @@ class LineFlux:
             return self._Sdv.to(unit)
 
     def to_ergscm2(self, Sdv: u.Quantity) -> u.Quantity:
-        dnu = 1.0 * u.Hz
-        dv = c.c * dnu / self.nu
+        dv = 1.0 * u.km / u.s
+        dnu = dv * self.nu / c.c
         return (Sdv / dv * dnu).to(self.u.ergscm2)
 
     def to_jykms(self, flux: u.Quantity) -> u.Quantity:
