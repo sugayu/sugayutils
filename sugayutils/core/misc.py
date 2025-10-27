@@ -86,6 +86,22 @@ def upsampling1d(grid: np.ndarray, rate_upsampling: int) -> np.ndarray:
     return res * (grid.max() - grid.min()) / len(grid) + grid.min()
 
 
+def upsampling1d_irregular(grid: np.ndarray, rate_upsampling: int) -> np.ndarray:
+    '''Make irregular grids up-sampring.'''
+    mid_array = (grid[1:] + grid[:-1]) / 2.0
+    edge0 = grid[0] - (mid_array[0] - grid[0])
+    edge1 = grid[-1] + (grid[-1] - mid_array[-1])
+    edges = np.concatenate(((edge0,), mid_array, (edge1,)))
+
+    wbins = (edges[1:] - edges[:-1]) / rate_upsampling
+    margins_left = wbins / 2.0
+    newgrid = np.array(
+        [edges[:-1] + margins_left + wbins * i for i in range(rate_upsampling)]
+    ).ravel()
+    newgrid = np.sort(newgrid)
+    return newgrid
+
+
 def finitediff(array: np.ndarray) -> np.ndarray:
     '''Get separations of data points.
 
