@@ -38,6 +38,7 @@ class LineList:
     HeI5876: u.Quantity = 5877.2432990 * u.AA
     HeI6678: u.Quantity = 6679.9955989 * u.AA
     HeI7067: u.Quantity = 7067.12521 * u.AA
+    HeI10833: u.Quantity = 10833.0 * u.AA
     SII6718: u.Quantity = 6718.29 * u.AA
     SII6733: u.Quantity = 6732.67 * u.AA
     SIII9071: u.Quantity = 9071.1 * u.AA
