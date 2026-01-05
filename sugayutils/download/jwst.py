@@ -169,7 +169,7 @@ def download_nirspecmsa_calibdata(
     downloader = NIRSpecMSADownloader(savetag=savetag, pool_maxsize=pool_maxsize)
 
     if obs is None:
-        downloader.query_criteria(**kwargs)
+        obs = downloader.query_criteria(**kwargs)
         if downloader.n_obs > nlimit:
             msg = (
                 'Too many observations satisfying the given criteria'
@@ -178,15 +178,17 @@ def download_nirspecmsa_calibdata(
             logger.error(msg)
             raise ValueError(msg)
     else:
-        downloader.obs = obs
-    assert isinstance(downloader.obs, Table)
+        # downloader.obs = obs
+        pass
+    # assert isinstance(downloader.obs, Table)
+    assert isinstance(obs, Table)
     logger.info(f'Number of observations: {downloader.n_obs}')
 
     obslist = downloader.chunk_observations(chunksize_download)
 
     if dryrun:
         product_list = downloader.get_product_list(obslist[0])
-        obs = downloader.obs
+        # obs = downloader.obs
         for i, _obs in enumerate(obs):
             _id, fil, name = _obs["proposal_id"], _obs["filters"], _obs["target_name"]
             logger.info(f'PID{_id}: {fil} -- {name}')
@@ -222,7 +224,8 @@ def download_nirspecmsa_calibdata(
     downloader.assert_emptyqueue()
 
     logger.info('====Download results====')
-    logger.info(f'Number of observations: {len(downloader.obs)}')
+    # logger.info(f'Number of observations: {len(downloader.obs)}')
+    logger.info(f'Number of observations: {len(obs)}')
     logger.info(f'Number of products: {len(product_list)}')
     now = datetime.today().strftime('%Y%m%d%H%M')
     downloader.write_results(now)
@@ -233,34 +236,34 @@ def download_nirspecmsa_calibdata(
     return obs
 
 
-class NIRSpecMSADownloader:
-    '''Download MSA data in multi-thread.
-
-    TODO:
-        - To devide run_get_product_list into
-            - run_get_product_list and
-            - get_product list_via_queue
-    '''
+class JWSTDownloader:
+    '''Download JWST data.'''
 
     path_download = PATH_DOWNLOAD
-    subdir_nirspecmsa = Path('JWST/NIRSpecMSA/')
+    subdir_data = Path('')
     subdir_tempdownload = 'tmp_download'
     dataRights = 'PUBLIC'
-    instrument_name = 'NIRSpec/MSA'
+    instrument_name = ''
     max_retries = 3
     time_limit = 10 * 60  # second
 
     def __init__(
         self, savetag: str = '', skip_existdata: bool = True, pool_maxsize: int = 0
     ) -> None:
+        if (not self.instrument_name) or (not self.subdir_data.name):
+            raise RuntimeError(
+                f'{self.__class__} needs the definition of '
+                'instrument_name and subdir_data as class variables.'
+            )
+
         self.savetag = savetag + '_' if savetag else ''
         self.skip_existdata = skip_existdata
         self.count_thread: int = 0
-        self.dpath = self.path_download / self.subdir_nirspecmsa
+        self.dpath = self.path_download / self.subdir_data
         self.dpath_downloading = self.dpath / self.subdir_tempdownload
         self.dpath.mkdir(exist_ok=True)
         self.dpath_downloading.mkdir(exist_ok=True)
-        self.obs: Table | None = None
+        # self._obs: Table | None = None
         self.product_list: Table | None = None
         self.manifest: Table | None = None
         self.queue_product: Queue = Queue()
@@ -268,41 +271,60 @@ class NIRSpecMSADownloader:
         self.queue_manifest: Queue = Queue()
         self.futures_manifest: list[Future] = []
 
+        # This new instance of ObservationsClass is needed
+        # (probably) because settings are controled by modify_sessions()
         self.mast = ObservationsClass()
         if pool_maxsize:
             self.modify_sessions(pool_maxsize, self.max_retries)
         # self.mast._parse_result = self._parse_result_modified
 
+    # @property
+    # def obs(self) -> Table:
+    #     if self._obs is None:
+    #         raise ValueError('obs is None.')
+    #     return self._obs
+
+    # @obs.setter
+    # def obs(self, value: Table) -> None:
+    #     self._obs = value
+
+    # @property
+    # def n_obs(self) -> int:
+    #     return len(self.obs)
+
     def query_criteria(
-        self, instrument_name=instrument_name, dataRights=dataRights, **kwargs
-    ) -> None:
+        self,
+        instrument_name: str | None = None,
+        dataRights: str | None = None,
+        **kwargs,
+    ) -> Table:
         '''Return results of observations query.'''
-        self.obs = self.mast.query_criteria(
+        if instrument_name is None:
+            instrument_name = self.instrument_name
+        if dataRights is None:
+            dataRights = self.dataRights
+
+        return self.mast.query_criteria(
             instrument_name=instrument_name,
             calib_level=3,
             dataRights=dataRights,
             **kwargs,
         )
 
-    def chunk_observations(self, size: int) -> list:
-        '''Make a list of chunks of queried observations.'''
-        if self.obs is None:
-            raise ValueError('obs is None.')
+    def chunk(self, observations: Table, size: int) -> list:
+        '''Make a list of chunks of queried observations.
 
+        This method aims to make chunks for sequential (parallel) downloads.
+        '''
         obslist = []
-        for i in range(self.n_obs // size + 1):
+        n_obs = len(observations)
+        for i in range(n_obs // size + 1):
             j0, j1 = i * size, (i + 1) * size
-            if j0 == self.n_obs:
+            if j0 == n_obs:
                 break
-            j1 = j1 if j1 <= self.n_obs else self.n_obs
-            obslist.append(self.obs[j0:j1])
+            j1 = j1 if j1 <= n_obs else n_obs
+            obslist.append(observations[j0:j1])
         return obslist
-
-    @property
-    def n_obs(self) -> int:
-        if self.obs is None:
-            raise ValueError('obs is None.')
-        return len(self.obs)
 
     def run_get_product_list(
         self, obslist: list[Table], exe: ThreadPoolExecutor
@@ -314,7 +336,7 @@ class NIRSpecMSADownloader:
 
     def get_product_list(
         self,
-        obs_chunk: Table,
+        obs: Table,
         queue_up: bool = False,
         retries: int = max_retries,
     ) -> Table:
@@ -326,7 +348,7 @@ class NIRSpecMSADownloader:
             tries += 1
             try:
                 logger.debug(f'{current_thread().name}: Producing...')
-                product = self.mast.get_product_list(obs_chunk)
+                product = self.mast.get_product_list(obs)
                 logger.debug(f'{current_thread().name}: Produce End')
             except (TimeoutError, RemoteServiceError) as e:
                 if tries > retries:
@@ -352,12 +374,14 @@ class NIRSpecMSADownloader:
             'Created product list in ' f'{current_thread().name} #{count_thread}'
         )
 
-        L2c = product['calib_level'] == 3
-        excude_csvandasn = product['productType'] != 'INFO'
-        product = product[np.where(L2c & excude_csvandasn)]
+        product = self._where_product(product)
         if queue_up:
             self.queue_product.put((count_thread, product))
         return product
+
+    def _where_product(self, product: Table) -> Table:
+        '''Private method to select data for download.'''
+        raise NotImplementedError('_where_product')
 
     def run_download_products(
         self, exe: ThreadPoolExecutor, cache: bool = True
@@ -524,3 +548,312 @@ class NIRSpecMSADownloader:
     #     if not all_results:
     #         logger.warning("Query returned no results.")
     #     return all_results
+
+
+class NIRSpecMSADownloader(JWSTDownloader):
+    '''Download MSA data in multi-thread.
+
+    TODO:
+        - To devide run_get_product_list into
+            - run_get_product_list and
+            - get_product list_via_queue
+    '''
+
+    subdir_nirspecmsa = Path('JWST/NIRSpecMSA/')
+    instrument_name = 'NIRSpec/MSA'
+
+    def __init__(
+        self, savetag: str = '', skip_existdata: bool = True, pool_maxsize: int = 0
+    ) -> None:
+        self.savetag = savetag + '_' if savetag else ''
+        self.skip_existdata = skip_existdata
+        self.count_thread: int = 0
+        self.dpath = self.path_download / self.subdir_nirspecmsa
+        self.dpath_downloading = self.dpath / self.subdir_tempdownload
+        self.dpath.mkdir(exist_ok=True)
+        self.dpath_downloading.mkdir(exist_ok=True)
+        self.obs: Table | None = None
+        self.product_list: Table | None = None
+        self.manifest: Table | None = None
+        self.queue_product: Queue = Queue()
+        self.futures_product: list[Future] = []
+        self.queue_manifest: Queue = Queue()
+        self.futures_manifest: list[Future] = []
+
+        self.mast = ObservationsClass()
+        if pool_maxsize:
+            self.modify_sessions(pool_maxsize, self.max_retries)
+        # self.mast._parse_result = self._parse_result_modified
+
+    def _where_product(self, product: Table) -> Table:
+        '''Private method to select data for download.'''
+        L2c = product['calib_level'] == 3
+        excude_csvandasn = product['productType'] != 'INFO'
+        raise product[np.where(L2c & excude_csvandasn)]
+
+    # def query_criteria(
+    #     self, instrument_name=instrument_name, dataRights=dataRights, **kwargs
+    # ) -> None:
+    #     '''Return results of observations query.'''
+    #     self.obs = self.mast.query_criteria(
+    #         instrument_name=instrument_name,
+    #         calib_level=3,
+    #         dataRights=dataRights,
+    #         **kwargs,
+    #     )
+
+    def chunk_observations(self, size: int) -> list:
+        '''Make a list of chunks of queried observations.'''
+        if self.obs is None:
+            raise ValueError('obs is None.')
+
+        obslist = []
+        for i in range(self.n_obs // size + 1):
+            j0, j1 = i * size, (i + 1) * size
+            if j0 == self.n_obs:
+                break
+            j1 = j1 if j1 <= self.n_obs else self.n_obs
+            obslist.append(self.obs[j0:j1])
+        return obslist
+
+    @property
+    def n_obs(self) -> int:
+        if self.obs is None:
+            raise ValueError('obs is None.')
+        return len(self.obs)
+
+    def run_get_product_list(
+        self, obslist: list[Table], exe: ThreadPoolExecutor
+    ) -> None:
+        '''Run Observations.get_product_list in units of observation chunks.'''
+        for obs in obslist:
+            future = exe.submit(self.get_product_list, obs, True)
+            self.futures_product.append(future)
+
+    # def get_product_list(
+    #     self,
+    #     obs_chunk: Table,
+    #     queue_up: bool = False,
+    #     retries: int = max_retries,
+    # ) -> Table:
+    #     '''Wrapper of Observations.get_product_list()'''
+    #     tries = 0
+    #     product: Table | None = None
+    #     t0 = time.time()
+    #     while product is None:
+    #         tries += 1
+    #         try:
+    #             logger.debug(f'{current_thread().name}: Producing...')
+    #             product = self.mast.get_product_list(obs_chunk)
+    #             logger.debug(f'{current_thread().name}: Produce End')
+    #         except (TimeoutError, RemoteServiceError) as e:
+    #             if tries > retries:
+    #                 logger.exception(
+    #                     f'Number of tries has exceeeded the max retries ({retries}) '
+    #                     f'in {current_thread().name}.'
+    #                 )
+    #                 raise e
+    #             logger.info(
+    #                 f'Retry #{retries} to create product list in '
+    #                 f'{current_thread().name} after 5 min. sleep.'
+    #             )
+    #             time.sleep(5 * 60)
+    #     t1 = time.time()
+
+    #     if (t1 - t0) > self.time_limit:
+    #         logger.info(f'Taking over {self.time_limit/60:.1f} min. Sleep 5 min.')
+    #         time.sleep(5 * 60)
+
+    #     count_thread = self.count_thread
+    #     self.count_thread += 1
+    #     logger.info(
+    #         'Created product list in ' f'{current_thread().name} #{count_thread}'
+    #     )
+
+    #     L2c = product['calib_level'] == 3
+    #     excude_csvandasn = product['productType'] != 'INFO'
+    #     product = product[np.where(L2c & excude_csvandasn)]
+    #     if queue_up:
+    #         self.queue_product.put((count_thread, product))
+    #     return product
+
+    def run_download_products(
+        self, exe: ThreadPoolExecutor, cache: bool = True
+    ) -> None:
+        '''Download data in units of observation chuncks.'''
+        if not self.futures_product:
+            raise ValueError('Product list is not ready.')
+        for _ in self.futures_product:
+            future = exe.submit(self.download_products, cache)
+            self.futures_manifest.append(future)
+
+    def download_products(self, cache: bool = True) -> Table:
+        '''Download throught queue'''
+
+        count_thread, product_list = self.queue_product.get()
+        # if self.skip_existdata:
+        #     product_list = self.check_exist(product_list)
+
+        logger.debug(f'{current_thread().name}: Downloading...')
+        try:
+            manifest = self.mast.download_products(
+                product_list,
+                download_dir=self.dpath_downloading,
+                flat=True,
+                verbose=False,
+                cache=cache,
+            )
+        except Exception as e:
+            raise e
+        logger.debug(f'{current_thread().name}: Download End')
+
+        logger.info(f'Downloaded products in {current_thread().name} #{count_thread}')
+        self.queue_manifest.put((product_list, manifest))
+        return manifest
+
+    def run_arrange_dirs(self) -> None:
+        '''Arrange directories in threads.'''
+        for _ in self.futures_manifest:
+            _product_list, _manifest = self.queue_manifest.get()
+            for m in _manifest:
+                self.arrange_dirs(_product_list, m)
+
+    def arrange_dirs(self, product_list: Table, manifest: Table) -> None:
+        '''Arrange directory structure for downloaded data.'''
+        assert self.obs is not None
+
+        path = Path(manifest['Local Path'])
+        info = product_list[np.where(path.name == product_list['productFilename'])]
+        obs_i = self.obs[np.where(self.obs['obsid'] == info['parent_obsid'][0])]
+        target_name = obs_i['target_name'][0]
+        filtername = ''.join(info['filters'][0].split(';'))
+        if path.suffix == '.fits':
+            subdir = 'product'
+        elif path.suffix == '.jpg':
+            subdir = 'images'
+        elif path.suffix == '.png':
+            subdir = 'images'
+        # elif path.suffix == '.json':
+        #     subdir = 'cal'
+        # elif path.suffix == '.csv':
+        #     subdir = 'cal'
+        if path.exists():
+            dname = self.savetag + target_name
+            newdpath = self.dpath / dname / filtername / subdir
+            newdpath.mkdir(parents=True, exist_ok=True)
+            newpath = newdpath / path.name
+            if newpath.exists():
+                logger.warning(
+                    f'The downloaded data, {newpath}, already exists. '
+                    f'The downloaded data was not be moved from {newpath}.'
+                )
+            else:
+                path.rename(newpath)
+
+    def check_exist(self, observations: Table) -> bool:
+        '''Check whether the data exists.'''
+        obs = observations[0]
+        fname = Path(obs['dataURL'][5:]).name
+        target_name = obs['target_name']
+        dname = self.savetag + target_name
+        filtername = ''.join(obs['filters'][0].split(';'))
+        subdir = 'product'
+        newdpath = self.dpath / dname / filtername / subdir / fname
+        return newdpath.exists()
+
+    def result(self) -> tuple[Table, Table]:
+        '''Wait results of product_list and manifest as results of download.'''
+        self.product_list = vstack([future.result() for future in self.futures_product])
+        self.manifest = vstack([future.result() for future in self.futures_manifest])
+        return self.product_list, self.manifest
+
+    def assert_emptyqueue(self) -> None:
+        assert self.queue_product.empty() is True
+        assert self.queue_manifest.empty() is True
+
+    def write_results(self, tag: str, savetag: str = '') -> None:
+        if self.product_list is None:
+            raise ValueError('Product list is not ready.')
+        if self.manifest is None:
+            raise ValueError('Manifest is not ready: Download has not been finished.')
+
+        self.product_list.write(
+            self.dpath / (self.savetag + f'downloads_{tag}.ecsv'), format='ascii.ecsv'
+        )
+        self.manifest.write(
+            self.dpath / (self.savetag + f'manifest_{tag}.ecsv'), format='ascii.ecsv'
+        )
+
+    def _change_poolsize(self, maxsize: int) -> None:
+        '''Change DEFAULT_POOLSIZE in the request package.
+
+        Default pool_maxsize is 10, but this is fewer than expected.
+        This value should be as many as the number of threads used in downloads.
+
+        NOTE:
+            This is deprecated because it's meaningless to change global variables
+            after defining the class that uses the variables as default arguments.
+        '''
+        if not isinstance(maxsize, int):
+            raise TypeError(f'Maxsize ({maxsize}) must be int.')
+        requests.adapters.DEFAULT_POOLSIZE = maxsize
+        # This is Omake.
+        requests.adapters.DEFAULT_RETRIES = 3
+
+    def modify_sessions(self, maxsize: int, max_retries: int) -> None:
+        session = self.mast._session.adapters['https://']
+        session._pool_maxsize = maxsize
+        session._pool_connections = maxsize
+        session.max_retries = max_retries
+        session.init_poolmanager(maxsize, maxsize, session._pool_block)
+
+        session = self.mast._session.adapters['http://']
+        session._maxsize = maxsize
+        session._pool_connections = maxsize
+        session.max_retries = max_retries
+        session.init_poolmanager(maxsize, maxsize, session._pool_block)
+
+    # def _parse_result_modified(self, responses, *, verbose=False) -> Table:
+    #     '''Same as _portal_api_connection._parse_result'''
+    #     connection = self.mast._portal_api_connection
+    #     result_list = []
+
+    #     # loading the columns config
+    #     col_config = None
+    #     if connection._current_service:
+    #         col_config = connection._column_configs.get(connection._current_service)
+    #         connection._current_service = None  # clearing current service
+
+    #     for resp in responses:
+    #         result = resp.json()
+
+    #         # check for error message
+    #         if result['status'] == "ERROR":
+    #             raise RemoteServiceError(
+    #                 result.get('msg', "There was an error with your request.")
+    #             )
+
+    #         result_table = _json_to_table(result, col_config)
+    #         result_list.append(result_table)
+
+    #     all_results = vstack(result_list)
+
+    #     # Check for no results
+    #     if not all_results:
+    #         logger.warning("Query returned no results.")
+    #     return all_results
+
+
+class NIRSpecIFUUncalDownloader(JWSTDownloader):
+    '''Download IFU data in multi-thread.'''
+
+    subdir_data = Path('JWST/NIRSpecIFU/')
+    instrument_name = 'NIRSpec/IFU'
+
+    def _where_product(self, product: Table) -> Table:
+        '''Private method to select data for download.'''
+        uncal = (product['calib_level'] == 1) & (product['productType'] == ['SCIENCE'])
+        miscs = (product['calib_level'] == 2) & (
+            (product['productType'] == 'PREVIEW') | (product['productType'] == 'INFO')
+        )
+        return product[np.where(uncal | miscs)]
