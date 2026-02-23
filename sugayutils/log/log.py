@@ -1,5 +1,6 @@
 '''Logging utilities.
 '''
+
 from datetime import datetime
 import inspect
 from pathlib import Path
@@ -16,6 +17,7 @@ def mylogconfig(
     print_console: bool = True,
     print_file: bool = False,
     filename: Optional[str] = None,
+    root_directory: Path | None = None,
 ) -> None:
     '''My log configuration.
 
@@ -40,6 +42,9 @@ def mylogconfig(
         if '<ipython' in filename:
             filename = 'ipython'
 
+    if root_directory is None:
+        root_directory = Path('')
+
     config = get_default_mylogconfig()
     config = modify_logconfig(
         config,
@@ -47,6 +52,7 @@ def mylogconfig(
         print_console=print_console,
         print_file=print_file,
         filename=filename,
+        root_directory=root_directory,
     )
     logconfig.dictConfig(config)
 
@@ -57,6 +63,7 @@ def modify_logconfig(
     print_console: bool = True,
     print_file: bool = False,
     filename: str = 'log',
+    root_directory: Path = Path(''),
 ) -> dict:
     '''Modify default log format to input configurations.'''
     config = config.copy()
@@ -65,7 +72,7 @@ def modify_logconfig(
         config['root']['handlers'].remove('consoleHandler')
     if print_file:
         date = datetime.today().strftime('%Y%m%d-%Hh%Mm%Ss')
-        path = Path(f'log/{filename}_{date}.log')
+        path = root_directory / f'log/{filename}_{date}.log'
         if not path.parent.exists():
             raise FileNotFoundError('No "log/" in the current working directory.')
         config['handlers']['fileHandler']['filename'] = str(path)
