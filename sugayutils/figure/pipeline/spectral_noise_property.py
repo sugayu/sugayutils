@@ -110,24 +110,29 @@ def draw_spectral_noise_property(
     )
 
     # auto correlation function
-    rng = default_rng(0)
-    _acf, acferr = acf(
-        rng.standard_normal(len(data.subtract)),
-        adjusted=True,
-        # nlags=len(data) - 1,
-        alpha=0.05,
-    )
+    len_acf = 25
+    # rng = default_rng(0)
+    # _acf, acferr = acf(
+    #     rng.standard_normal(len(data.subtract)),
+    #     adjusted=True,
+    #     # nlags=len(data) - 1,
+    #     alpha=0.05,
+    # )
     ml, _, _ = axs0[0, 3].stem(
-        np.arange(len(_acf)),
-        data.err_autocorr[: len(_acf)],
+        np.arange(len_acf),
+        data.err_autocorr[:len_acf],
         markerfmt=axs0[0, 3].colorful(c),
         linefmt=axs0[0, 3].colorful('gray'),
         basefmt=axs0[0, 3].colorful('black'),
     )
     ml.set_markersize(1.0)
-    acferr = acferr[:, 0] - _acf
+    # acferr = acferr[:, 0] - _acf
     axs0[0, 3].fill_between(
-        np.arange(len(_acf)), acferr, -acferr, c='bgray', zorder=0.5
+        np.arange(len_acf),
+        data.err_autocorr_error[:len_acf],
+        -data.err_autocorr_error[:len_acf],
+        c='bgray',
+        zorder=0.5,
     )
     axs0[1, 0].remove_frame()
     axs0[1, 1].remove_frame()
