@@ -74,7 +74,9 @@ def modify_logconfig(
         date = datetime.today().strftime('%Y%m%d-%Hh%Mm%Ss')
         path = root_directory / f'log/{filename}_{date}.log'
         if not path.parent.exists():
-            raise FileNotFoundError('No "log/" in the current working directory.')
+            raise FileNotFoundError(
+                f'No "log/" in the current working directory ({root_directory}).'
+            )
         config['handlers']['fileHandler']['filename'] = str(path)
     else:
         del config['handlers']['fileHandler']
