@@ -7,7 +7,7 @@ from logging import getLogger
 import numpy as np
 from numpy.random import default_rng
 
-__all__ = ['get_noisesource']
+__all__ = ['get_noisesource', 'corrmatrix', 'covmatrix']
 
 logger = getLogger(__name__)
 
@@ -81,4 +81,29 @@ def get_noisesource(
     raise ValueError(f'Currently, covar ndim=={covar.ndim} is not implemented.')
 
 
-def make_covar(self) -> None: ...
+def corrmatrix(*args, size: int) -> np.ndarray:
+    '''Retrun correlation matrix.
+
+    The input arguments indicate correlation value of n-th off-diagonal elements.
+
+    Note:
+        This function is copied from roble. It might be better to be integrated
+        in the future.
+    '''
+    corr = np.identity(size)
+    for i, arg in enumerate(args, 1):
+        r = np.full(size - i, arg)
+        corr += np.diag(r, i) + np.diag(r, -i)
+    return corr
+
+
+def covmatrix(sigma: np.ndarray, *args) -> np.ndarray:
+    '''Retrun covariance matrix.
+
+    The input arguments indicate correlation value of n-th off-diagonal elements.
+    '''
+    if sigma.ndim != 1:
+        raise ValueError(f'sigma.ndim must be 1, but now {sigma.ndim}')
+
+    corr = corrmatrix(args, size=sigma.size)
+    return sigma.reshape(-1, 1) * corr * sigma
