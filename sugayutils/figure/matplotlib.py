@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 from typing import Iterable, Sequence, TypeVar
+from dataclasses import dataclass
 from pathlib import Path
 from logging import getLogger
 from fontTools.ttLib import TTCollection
@@ -25,6 +26,14 @@ __all__ = ['makefig', 'Axes', 'Figure', 'DS9LogNorm']
 
 
 ##
+@dataclass(frozen=True)
+class CanvasSize:
+    SMALL: float = 3.5
+    LARGE: float = 7.3
+    A4H: float = 11.69
+    A4W: float = 8.27
+
+
 class Axes(mplaxes.Axes):
     '''Wrapper of Axes'''
 
@@ -86,7 +95,7 @@ class Axes(mplaxes.Axes):
         ndata: int,
         scale_factor: float = 2.0,
     ) -> float:
-        '''Gvie an appropreate markersize.'''
+        '''Give an appropreate markersize.'''
         width_inch_fig = fig.bbox_inches.width
         scale_w = ax.get_position().width
         height_inch_fig = fig.bbox_inches.height
@@ -124,11 +133,20 @@ class Axes(mplaxes.Axes):
             _kwargs['elinewidth'] = elw
         return super().errorbar(*args, **_kwargs)
 
-    def hist(self, *args, c: str | None = None, ec: str | None = None, **kwargs):
+    def hist(
+        self,
+        *args,
+        c: str | Sequence[str] | None = None,
+        ec: str | None = None,
+        **kwargs,
+    ):
         '''Wrapper of scatter'''
         _kwargs = kwargs.copy()
         if c is not None:
-            _kwargs['color'] = self.colorful(c)
+            if isinstance(c, str):
+                _kwargs['color'] = self.colorful(c)
+            else:
+                _kwargs['color'] = tuple([self.colorful(_c) for _c in c])
         if ec is not None:
             _kwargs['ecolor'] = self.colorful(ec)
         if 'rwidth' not in _kwargs:
@@ -485,14 +503,14 @@ def makefig(**kwargs) -> Figure:
     '''Wrapper of plt.figure().'''
     _kwargs = kwargs.copy()
     if ('figsize' in kwargs) and ('a4' in kwargs['figsize']):
-        _kwargs['figsize'] = (8.27, 11.69)
+        _kwargs['figsize'] = (CanvasSize.A4W, CanvasSize.A4H)
     if ('figsize' in kwargs) and ('a4l' in kwargs['figsize']):
         # landscape
-        _kwargs['figsize'] = (11.69, 8.27)
+        _kwargs['figsize'] = (CanvasSize.A4H, CanvasSize.A4W)
     if ('figsize' in kwargs) and ('small' in kwargs['figsize']):
-        _kwargs['figsize'] = (3.5, 3.5 * kwargs['figsize'][1])
+        _kwargs['figsize'] = (CanvasSize.SMALL, CanvasSize.SMALL * kwargs['figsize'][1])
     if ('figsize' in kwargs) and ('large' in kwargs['figsize']):
-        _kwargs['figsize'] = (7.3, 7.3 * kwargs['figsize'][1])
+        _kwargs['figsize'] = (CanvasSize.LARGE, CanvasSize.LARGE * kwargs['figsize'][1])
     return plt.figure(FigureClass=Figure, **_kwargs)
 
 
