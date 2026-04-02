@@ -9,8 +9,9 @@ from numpy.random import default_rng
 import numpy.typing as npt
 from astropy.stats import sigma_clip
 from statsmodels.tsa.stattools import acf
-from sugayutils.figure import makefig, Figure
+from sugayutils.figure import makefig, Figure, Axes
 from logging import getLogger
+from palettable.scientific.sequential import Hawaii_20_r
 
 logger = getLogger(__name__)
 
@@ -140,12 +141,24 @@ def draw_spectral_noise_property(
     axs0[1, 3].remove_frame()
 
     # correlations
-    axs1[1, 0].scatter(yy[:-1], yy[1:], s=2**2, c='gray', mec=(1, 1, 1, 0.5), mew=0.4)
-    axs1[1, 0].text(0.1, 0.9, 'Index 1', transform=axs1[1, 0].transAxes)
-    axs1[1, 1].scatter(yy[:-2], yy[2:], s=2**2, c='gray', mec=(1, 1, 1, 0.5), mew=0.4)
-    axs1[1, 1].text(0.1, 0.9, 'Index 2', transform=axs1[1, 1].transAxes)
-    axs1[1, 2].scatter(yy[:-3], yy[3:], s=2**2, c='gray', mec=(1, 1, 1, 0.5), mew=0.4)
-    axs1[1, 2].text(0.1, 0.9, 'Index 3', transform=axs1[1, 2].transAxes)
+    c = data.wave[~data.mask.astype(bool)]
+
+    def plot_scatter(ax: Axes, index):
+        ax.scatter(
+            yy[:-index],
+            yy[index:],
+            s=1.3**2,
+            c=c[index:],
+            # mec=(1, 1, 1, 0.0),
+            # mew=0.2,
+            mec='None',
+            cmap=Hawaii_20_r.mpl_colormap,
+        )
+        ax.text(0.1, 0.9, f'Index {index}', transform=ax.transAxes)
+
+    plot_scatter(axs1[1, 0], 1)
+    plot_scatter(axs1[1, 1], 2)
+    plot_scatter(axs1[1, 2], 3)
     axs1[0, 0].remove_frame()
     axs1[0, 1].remove_frame()
     axs1[0, 2].remove_frame()
