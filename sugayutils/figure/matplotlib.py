@@ -18,6 +18,7 @@ from ..core.const import colors
 from ..core.misc import listup_instancevar
 from ..stat.kde import KDE
 from . import mlmodern
+from .wcsaxes import WCS, WCSAxes, WCSAxesProjection
 
 logger = getLogger(__name__)
 
@@ -363,6 +364,12 @@ class Figure(mplfig.Figure):
     ) -> npt.NDArray[np.object_]:
         if ('projection' not in subplot_kw) and ('projection' not in kwargs):
             subplot_kw.setdefault('axes_class', Axes)
+
+        if isinstance(proj := subplot_kw.get('projection', None), WCS):
+            subplot_kw['projection'] = WCSAxesProjection(proj)
+        if isinstance(proj := kwargs.get('projection', None), WCS):
+            kwargs['projection'] = None
+            subplot_kw['projection'] = WCSAxesProjection(proj)
         return super().subplots(subplot_kw=subplot_kw, *args, **kwargs)
 
     def add_axes(self, *args, **kwargs) -> Axes:
@@ -373,6 +380,8 @@ class Figure(mplfig.Figure):
     def add_subplot(self, *args, **kwargs) -> Axes:
         if 'projection' not in kwargs:
             kwargs.setdefault('axes_class', Axes)
+        if isinstance(proj := kwargs.get('projection', None), WCS):
+            kwargs['projection'] = WCSAxesProjection(proj)
         return super().add_subplot(*args, **kwargs)
 
     def colorbar(
