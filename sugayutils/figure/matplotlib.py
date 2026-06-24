@@ -302,8 +302,8 @@ class Axes(mplaxes.Axes):
 
     def remove_xyticklabels(self):
         '''Erase both x and y labels'''
-        self.xaxis.set_ticklabels('')
-        self.yaxis.set_ticklabels('')
+        self.remove_xticklabel()
+        self.remove_yticklabel()
 
     def set_xylims(self, xlim, ylim):
         '''Set xlim and ylim at the same time.'''

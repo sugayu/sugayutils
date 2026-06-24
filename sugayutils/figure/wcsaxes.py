@@ -40,6 +40,24 @@ class WCSAxes(wcsaxes.WCSAxes):
         )
         self.set_ylim(ylim)
 
+    def remove_xticklabel(self):
+        '''Erase xlabel'''
+        return self.coords[0].set_ticklabel_visible(False)
+
+    def remove_yticklabel(self):
+        '''Erase ylabel'''
+        return self.coords[1].set_ticklabel_visible(False)
+
+    def remove_xyticklabels(self):
+        '''Erase both x and y labels'''
+        self.remove_xticklabel()
+        self.remove_yticklabel()
+
+    def set_xylabels(self, xlabel, ylabel, **kwargs):
+        '''Set xlabel and ylable at the same time.'''
+        self.set_xlabel(xlabel, **kwargs)
+        self.set_ylabel(ylabel, **kwargs)
+
 
 class WCSAxesProjection:
 
