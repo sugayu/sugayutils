@@ -65,5 +65,4 @@ class WCSAxesProjection:
         self.wcs = wcs
 
     def _as_mpl_axes(self):
-        logger.info('in _as_mpl_axes')
         return (WCSAxes, {'wcs': self.wcs})

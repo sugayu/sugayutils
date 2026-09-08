@@ -7,7 +7,7 @@ from logging import getLogger
 import numpy as np
 from numpy.random import default_rng
 
-__all__ = ['get_noisesource', 'corrmatrix', 'covmatrix']
+__all__ = ['get_noisesource', 'corrmatrix', 'covmatrix', 'NoiseSourceBase']
 
 logger = getLogger(__name__)
 
@@ -17,6 +17,8 @@ class NoiseSourceBase(ABC):
     '''Base class of noise sources.'''
 
     def __init__(self, seed: int | None = None) -> None:
+        self.is_correlated: bool
+        self.size: int
         self.rng = default_rng(seed)
 
     def __call__(self, nspec: int = 1) -> np.ndarray:
@@ -35,6 +37,7 @@ class IndependentNoiseSource(NoiseSourceBase):
         self.sigma = sigma
         self.size = len(sigma)
         super().__init__(seed)
+        self.is_correlated = False
 
     def generate(self, nspec: int = 1) -> np.ndarray:
         if nspec == 1:
@@ -57,6 +60,7 @@ class CorrelatedNoiseSource(NoiseSourceBase):
         self.covar = covar
         self.size = len(covar)
         super().__init__(seed)
+        self.is_correlated = True
 
     def generate(self, nspec: int = 1) -> np.ndarray:
         return self.rng.multivariate_normal(np.zeros(self.size), self.covar, size=nspec)

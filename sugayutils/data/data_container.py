@@ -7,6 +7,7 @@ from typing import NamedTuple
 from logging import getLogger
 import numpy as np
 from astropy.nddata import CCDData
+import astropy.units as u
 from astropy.wcs import WCS
 from astropy.coordinates import SkyCoord, SpectralCoord
 
@@ -52,6 +53,14 @@ class SkyCoordUtils:
             *tuple(itertools.zip_longest(*self._pix.corners))
         )
 
+    @property
+    def dra(self) -> u.Quantity:
+        return (self._wcs.wcs.cdelt[0] * u.deg).to(u.arcsec)
+
+    @property
+    def ddec(self) -> u.Quantity:
+        return (self._wcs.wcs.cdelt[1] * u.deg).to(u.arcsec)
+
 
 class SpecCoordUtils:
     '''Utilities returning spec coordinates.'''
@@ -59,7 +68,7 @@ class SpecCoordUtils:
     def __init__(self, shape: tuple[int, ...], wcs: WCS) -> None:
         assert wcs.naxis == len(shape)
         dim = wcs.naxis
-        ispec = dim - wcs.wcs.spec
+        ispec = dim - wcs.wcs.spec - 1
         self._shape = (shape[ispec],)
         self._pix = PixelCoordUtils(self._shape)
         self._wcs = wcs.spectral
@@ -73,6 +82,10 @@ class SpecCoordUtils:
         return self._wcs.pixel_to_world(
             *tuple(itertools.zip_longest(*self._pix.corners))
         )
+
+    @property
+    def frequency(self) -> SkyCoord:
+        return self._wcs.pixel_to_world(np.arange(self._shape[0])).to(u.GHz)
 
 
 class PixelCoordUtils:

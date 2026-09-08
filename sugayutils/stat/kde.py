@@ -1,8 +1,11 @@
 '''Wrapper of Kernel Distribution Estimates.
 '''
+
 from typing import Sequence
 import numpy as np
 from scipy.stats import gaussian_kde
+
+__all__ = ['KDE']
 
 
 ##
